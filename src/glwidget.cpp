@@ -113,12 +113,29 @@ GLWidget::GLWidget(QWidget *parent)
     runningTime = 0.0;
 
     grid = SpatialGrid(1.0);
-    glm::vec3 point1 = glm::vec3(1.0, 1.0, 1.0);
-    glm::vec3 point2 = glm::vec3(1.5, 1.5, 1.5);
-    glm::vec3 point3 = glm::vec3(4.5, 4.5, 5.5);
-    int ref1 = grid.insertPoint(point1);
-    int ref2 = grid.insertPoint(point2);
-    int ref3 = grid.insertPoint(point3);
+
+    srand(time(NULL));
+    float max = 10.0;
+
+    int n = 100000;
+    for (int i=0; i<n; i++) {
+        float r = (float)rand() / (float)RAND_MAX;
+        float x = r * max;
+        r = (float)rand() / (float)RAND_MAX;
+        float y = r * max * cos(x);
+        r = (float)rand() / (float)RAND_MAX;
+        float z = r * max * sin(y)*cos(x);
+
+        float vmax = 0.1;
+        float vx = (2*((float)rand() / (float)RAND_MAX) - 1.0) * vmax;
+        float vy = (2*((float)rand() / (float)RAND_MAX) - 1.0) * vmax;
+        float vz = (2*((float)rand() / (float)RAND_MAX) - 1.0) * vmax;
+
+        glm::vec3 p = glm::vec3(x, y, z);
+        glm::vec3 v = glm::vec3(vx, vy, vz);
+        int ref = grid.insertPoint(p);
+        gridTest.push_back(std::tuple<int,glm::vec3, glm::vec3>(ref, p, v));
+    }
 
     //grid.movePoint(ref, glm::vec3(5.0, 1.0, 1.0));
 
@@ -186,6 +203,27 @@ void GLWidget::updateSimulation() {
     updateCameraMovement(dt);
 
     dt *= deltaTimeModifier;  // speed of simulation
+
+    dt = 1.0/30.0;
+    //grid test
+    for (int i=0; i<(int)gridTest.size(); i++) {
+        int ref = std::get<0>(gridTest[i]);
+        glm::vec3 p = std::get<1>(gridTest[i]);
+        glm::vec3 v = std::get<2>(gridTest[i]);
+
+        p = p + dt*v;
+        std::get<1>(gridTest[i]) = p;
+
+        if ((float)rand() / (float)RAND_MAX > 0.98) {
+            float vmax = 0.5;
+            float vx = (2*((float)rand() / (float)RAND_MAX) - 1.0) * vmax;
+            float vy = (2*((float)rand() / (float)RAND_MAX) - 1.0) * vmax;
+            float vz = (2*((float)rand() / (float)RAND_MAX) - 1.0) * vmax;
+            std::get<2>(gridTest[i]) = glm::vec3(vx, vy, vz);
+        }
+
+        grid.movePoint(ref, p);
+    }
 }
 
 // Draws coordinate axis' and floor grid
@@ -258,7 +296,15 @@ void GLWidget::paintGL()
     camera.set();
     drawGrid();
 
+    float scale = 2.0;
+    glm::mat4 scaleMat = glm::transpose(glm::mat4(scale, 0.0, 0.0, 0.0,
+                                                  0.0, scale, 0.0, 0.0,
+                                                  0.0, 0.0, scale, 0.0,
+                                                  0.0, 0.0, 0.0, 1.0));
+    glPushMatrix();
+    glMultMatrixf((GLfloat*)&scaleMat);
     grid.draw();
+    glPopMatrix();
 
     camera.unset();
 }
@@ -318,15 +364,17 @@ void GLWidget::keyReleaseEvent(QKeyEvent *event)
 
 void GLWidget::mousePressEvent(QMouseEvent *event)
 {
-
+    (void)event;
 }
 
 void GLWidget::mouseReleaseEvent(QMouseEvent *event)
 {
+    (void)event;
 }
 
 void GLWidget::mouseMoveEvent(QMouseEvent *event)
 {
+    (void)event;
 }
 
 

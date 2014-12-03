@@ -58,6 +58,9 @@
 #include <GL/glu.h>
 #include <QGLWidget>
 #include <vector>
+#include <tuple>
+#include <stdlib.h>     /* srand, rand */
+#include <time.h>       /* time */
 #include "glm/glm.hpp"
 #include "camera3d.h"
 #include "utils.h"
@@ -134,6 +137,7 @@ private:
     float runningTime;
 
     SpatialGrid grid;
+    std::vector<std::tuple<int, glm::vec3, glm::vec3>> gridTest;
 };
 
 #endif

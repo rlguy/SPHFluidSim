@@ -6,15 +6,11 @@
 #include <GL/glu.h>
 #include <QDebug>
 #include <cmath>
+#include <time.h>
 #include "glm/glm.hpp"
 #include "cellhash.h"
-#include "gridcell.h"
 #include "utils.h"
-
-struct GridPoint {
-    glm::vec3 position;
-    int id;
-};
+#include "gridcell.h"
 
 class SpatialGrid
 {
@@ -23,6 +19,7 @@ public:
     SpatialGrid(double cell_size);
     int insertPoint(glm::vec3 point);
     void movePoint(int id, glm::vec3 position);
+    std::vector<glm::vec3> getObjectsInRadiusOfPoint(int ref, double radius);
     void draw();
 
 private:
@@ -32,6 +29,7 @@ private:
     void positionToIJK(glm::vec3 p, int *i, int *j, int *k);
     glm::vec3 IJKToPosition(int i, int j, int k);
     GridCell* getNewGridCell();
+    void updateGridPointCellOffset(GridPoint *gp, int i, int j, int k);
 
     double size;
     int currentGridPointID;

@@ -13,10 +13,21 @@ void GridCell::insertGridPoint(GridPoint *gp) {
     points.push_back(gp);
 }
 
-void GridCell::reset() {
-    while (!points.empty())
-    {
-        points.pop_back();
+void GridCell::removeGridPoint(GridPoint *gp) {
+
+    for (int i=0; i<(int)points.size(); i++) {
+        if (points[i]->id == gp->id) {
+            points.erase(points.begin() + i);
+            return;
+        }
     }
+}
+
+bool GridCell::isEmpty() {
+    return points.size() == 0;
+}
+
+void GridCell::reset() {
+    points.clear();
     i = 0; j = 0; k = 0;
 }

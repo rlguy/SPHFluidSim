@@ -11,16 +11,16 @@ class CellHash
 public:
     CellHash();
     bool isGridCellInHash(int i, int j, int k);
-    bool isGridCellInHash(int i, int j, int k, GridCell *cell);
     void insertGridCell(int i, int j, int k, GridCell *cell);
+    void removeGridCell(int i, int j, int k);
     GridCell* getGridCell(int i, int j, int k);
     void getGridCells(std::vector<GridCell*> *cells);
 
 private:
-    int computeHash(int i, int j, int k);
+    long computeHash(int i, int j, int k);
 
-    int maxNumHashValues;
-    std::unordered_map<int, std::vector<GridCell*>> cellMap;
+    long maxNumHashValues;
+    std::unordered_map<long, std::vector<GridCell*>> cellMap;
 };
 
 #endif // CELLHASH_H

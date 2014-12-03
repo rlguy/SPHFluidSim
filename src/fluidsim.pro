@@ -9,7 +9,8 @@ HEADERS       = glwidget.h \
     utils.h \
     spatialgrid.h \
     cellhash.h \
-    gridcell.h
+    gridcell.h \
+    gridpoint.h
 SOURCES       = glwidget.cpp \
                 main.cpp \
                 window.cpp \

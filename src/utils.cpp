@@ -5,6 +5,64 @@
 
 namespace utils {
 
+    // Draws coordinate axis' and floor grid
+    void drawGrid() {
+        // draw axis'
+        float len = 10.0;
+        glLineWidth(3.0);
+        glBegin(GL_LINES);
+        glColor3f(1.0, 0.0, 0.0);   // x
+        glVertex3f(0.0, 0.0, 0.0);
+        glVertex3f(len, 0.0, 0.0);
+        glColor3f(0.0, 1.0, 0.0);   // y
+        glVertex3f(0.0, 0.0, 0.0);
+        glVertex3f(0.0, len, 0.0);
+        glColor3f(0.0, 0.0, 1.0);   // z
+        glVertex3f(0.0, 0.0, 0.0);
+        glVertex3f(0.0, 0.0, len);
+        glEnd();
+
+        // draw outline around xy, zy planes
+        glLineWidth(2.0);
+        glColor4f(0.0, 0.0, 0.0, 0.3);
+        glBegin(GL_LINES);
+        glVertex3f(0.0, len, 0.0);
+        glVertex3f(len, len, 0.0);
+        glVertex3f(len, len, 0.0);
+        glVertex3f(len, 0.0, 0.0);
+        glVertex3f(0.0, len, 0.0);
+        glVertex3f(0.0, len, len);
+        glVertex3f(0.0, len, len);
+        glVertex3f(0.0, 0.0, len);
+        glEnd();
+
+
+        // draw xz plane grid
+        float spacing = 0.25;
+        int yLines = 120;
+        int zLines = 120;
+        float height = (float)yLines * spacing;
+        float width = (float)zLines * spacing;
+
+        float z = spacing;
+        glLineWidth(1.0);
+        glColor4f(0.0, 0.0, 0.0, 0.2);
+        glBegin(GL_LINES);
+        for (int i=0; i < yLines; i++) {
+            glVertex3f(0.0, 0.0, z);
+            glVertex3f(width, 0.0, z);
+            z += spacing;
+        }
+
+        float x = spacing;
+        for (int i=0; i < zLines; i++) {
+            glVertex3f(x, 0.0, 0.0);
+            glVertex3f(x, 0.0, height);
+            x += spacing;
+        }
+        glEnd();
+    }
+
     void drawWireframeCube(glm::vec3 pos, float size) {
         float h = 0.5*size;
         glBegin(GL_LINES);

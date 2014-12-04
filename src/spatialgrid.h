@@ -20,6 +20,7 @@ public:
     int insertPoint(glm::vec3 point);
     void movePoint(int id, glm::vec3 position);
     std::vector<glm::vec3> getObjectsInRadiusOfPoint(int ref, double radius);
+    std::vector<int> getIDsInRadiusOfPoint(int ref, double radius);
     void draw();
 
 private:

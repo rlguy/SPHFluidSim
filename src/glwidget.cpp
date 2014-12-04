@@ -111,31 +111,25 @@ GLWidget::GLWidget(QWidget *parent)
     maxDeltaTimeModifier = 1.0;
     deltaTimeModifier = maxDeltaTimeModifier;
     runningTime = 0.0;
+    currentFrame = 0;
 
-    grid = SpatialGrid(1.0);
 
-    srand(time(NULL));
-    float max = 10.0;
+    double radius = 0.2;
+    fluidSim = SPHFluidSimulation(radius);
 
-    int n = 10000;
-    for (int i=0; i<n; i++) {
-        float r = (float)rand() / (float)RAND_MAX;
-        float x = r * max;
-        r = (float)rand() / (float)RAND_MAX;
-        float y = r * max * cos(x);
-        r = (float)rand() / (float)RAND_MAX;
-        float z = r * max * sin(y)*cos(x);
-
-        float vmax = 0.1;
-        float vx = (2*((float)rand() / (float)RAND_MAX) - 1.0) * vmax;
-        float vy = (2*((float)rand() / (float)RAND_MAX) - 1.0) * vmax;
-        float vz = (2*((float)rand() / (float)RAND_MAX) - 1.0) * vmax;
-
-        glm::vec3 p = glm::vec3(x, y, z);
-        glm::vec3 v = glm::vec3(vx, vy, vz);
-        int ref = grid.insertPoint(p);
-        gridTest.push_back(std::tuple<int,glm::vec3, glm::vec3>(ref, p, v));
+    std::vector<glm::vec3> points;
+    int n = 10;
+    float pad = 0.5*radius;
+    glm::vec3 r = glm::vec3(2.0, 1.0, 2.0);
+    for (int k=0; k<n; k++) {
+        for (int j=0; j<n; j++) {
+            for (int i=0; i<n; i++) {
+                glm::vec3 p = r + glm::vec3(i*pad, j*pad, k*pad);
+                points.push_back(p);
+            }
+        }
     }
+    fluidSim.addFluidParticles(points);
 
 }
 
@@ -203,84 +197,9 @@ void GLWidget::updateSimulation() {
     dt *= deltaTimeModifier;  // speed of simulation
 
     dt = 1.0/30.0;
-    //grid test
-    for (int i=0; i<(int)gridTest.size(); i++) {
-        int ref = std::get<0>(gridTest[i]);
-        glm::vec3 p = std::get<1>(gridTest[i]);
-        glm::vec3 v = std::get<2>(gridTest[i]);
 
-        p = p + dt*v;
-        std::get<1>(gridTest[i]) = p;
-
-        if ((float)rand() / (float)RAND_MAX > 0.98) {
-            float vmax = 0.5;
-            float vx = (2*((float)rand() / (float)RAND_MAX) - 1.0) * vmax;
-            float vy = (2*((float)rand() / (float)RAND_MAX) - 1.0) * vmax;
-            float vz = (2*((float)rand() / (float)RAND_MAX) - 1.0) * vmax;
-            std::get<2>(gridTest[i]) = glm::vec3(vx, vy, vz);
-        }
-
-        grid.movePoint(ref, p);
-    }
-}
-
-// Draws coordinate axis' and floor grid
-void GLWidget::drawGrid() {
-    // draw axis'
-    float len = 10.0;
-    glLineWidth(3.0);
-    glBegin(GL_LINES);
-    glColor3f(1.0, 0.0, 0.0);   // x
-    glVertex3f(0.0, 0.0, 0.0);
-    glVertex3f(len, 0.0, 0.0);
-    glColor3f(0.0, 1.0, 0.0);   // y
-    glVertex3f(0.0, 0.0, 0.0);
-    glVertex3f(0.0, len, 0.0);
-    glColor3f(0.0, 0.0, 1.0);   // z
-    glVertex3f(0.0, 0.0, 0.0);
-    glVertex3f(0.0, 0.0, len);
-    glEnd();
-
-    // draw outline around xy, zy planes
-    glLineWidth(2.0);
-    glColor4f(0.0, 0.0, 0.0, 0.3);
-    glBegin(GL_LINES);
-    glVertex3f(0.0, len, 0.0);
-    glVertex3f(len, len, 0.0);
-    glVertex3f(len, len, 0.0);
-    glVertex3f(len, 0.0, 0.0);
-    glVertex3f(0.0, len, 0.0);
-    glVertex3f(0.0, len, len);
-    glVertex3f(0.0, len, len);
-    glVertex3f(0.0, 0.0, len);
-    glEnd();
-
-
-    // draw xz plane grid
-    float spacing = 0.25;
-    int yLines = 120;
-    int zLines = 120;
-    float height = (float)yLines * spacing;
-    float width = (float)zLines * spacing;
-
-    float z = spacing;
-    glLineWidth(1.0);
-    glColor4f(0.0, 0.0, 0.0, 0.2);
-    glBegin(GL_LINES);
-    for (int i=0; i < yLines; i++) {
-        glVertex3f(0.0, 0.0, z);
-        glVertex3f(width, 0.0, z);
-        z += spacing;
-    }
-
-    float x = spacing;
-    for (int i=0; i < zLines; i++) {
-        glVertex3f(x, 0.0, 0.0);
-        glVertex3f(x, 0.0, height);
-        x += spacing;
-    }
-    glEnd();
-
+    // fluidSim test
+    fluidSim.update(dt);
 }
 
 
@@ -289,7 +208,7 @@ void GLWidget::drawAnimation() {
 
 }
 
-bool GLWidget::saveFrameToFile(const char *fileName) {
+bool GLWidget::saveFrameToFile(QString fileName) {
     GLubyte *data = (GLubyte*)malloc(4*(int)screenWidth*(int)screenHeight);
     if( data ) {
         glReadPixels(0, 0, screenWidth, screenHeight,
@@ -320,7 +239,7 @@ bool GLWidget::saveFrameToFile(const char *fileName) {
 void GLWidget::paintGL()
 {
     camera.set();
-    drawGrid();
+    utils::drawGrid();
 
     float scale = 2.0;
     glm::mat4 scaleMat = glm::transpose(glm::mat4(scale, 0.0, 0.0, 0.0,
@@ -329,15 +248,22 @@ void GLWidget::paintGL()
                                                   0.0, 0.0, 0.0, 1.0));
     glPushMatrix();
     glMultMatrixf((GLfloat*)&scaleMat);
-    grid.draw();
+    fluidSim.draw();
     glPopMatrix();
 
     camera.unset();
 
 
-    //saveFrameToFile("image_test2.png");
-    std::string s = "hello" + std::to_string(42);
-    qDebug() << QString::fromStdString(s);
+    /*
+    std::string s = std::to_string(currentFrame);
+    s.insert(s.begin(), 6 - s.size(), '0');
+    s = "test_render/" + s + ".png";
+    bool r = saveFrameToFile(QString::fromStdString(s));
+
+    qDebug() << r << QString::fromStdString(s);
+    */
+
+    currentFrame += 1;
 }
 
 void GLWidget::resizeGL(int width, int height)

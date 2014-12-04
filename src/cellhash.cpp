@@ -5,7 +5,7 @@ CellHash::CellHash()
     maxNumHashValues = 10000;
 }
 
-long CellHash::computeHash(int i, int j, int k) {
+inline long CellHash::computeHash(int i, int j, int k) {
     return (abs(541*(long)i + 79*(long)j + 31*(long)k) % maxNumHashValues);
 }
 

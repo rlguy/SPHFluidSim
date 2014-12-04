@@ -195,7 +195,55 @@ std::vector<glm::vec3> SpatialGrid::getObjectsInRadiusOfPoint(int ref, double r)
     return objects;
 }
 
+std::vector<int> SpatialGrid::getIDsInRadiusOfPoint(int ref, double r) {
+    std::vector<int> objects;
+
+    if (gridPointsByID.find(ref) == gridPointsByID.end()) {
+        return objects;
+    }
+
+    GridPoint *p = gridPointsByID[ref];
+    double tx = p->tx;
+    double ty = p->ty;
+    double tz = p->tz;
+    int i, j, k;
+    positionToIJK(p->position, &i, &j, &k);
+    double inv = 1/size;
+    double rsq = r*r;
+
+    int imin = i - fmax(0, ceil((r-tx)*inv));
+    int jmin = j - fmax(0, ceil((r-ty)*inv));
+    int kmin = k - fmax(0, ceil((r-tz)*inv));
+    int imax = i + fmax(0, ceil((r-size+tx)*inv));
+    int jmax = j + fmax(0, ceil((r-size+ty)*inv));
+    int kmax = k + fmax(0, ceil((r-size+tz)*inv));
+
+    for (int ii=imin; ii<=imax; ii++) {
+      for (int jj=jmin; jj<=jmax; jj++) {
+        for (int kk=kmin; kk<=kmax; kk++) {
+
+            if (cellHashTable.isGridCellInHash(ii, jj, kk)) {
+                GridCell *cell = cellHashTable.getGridCell(ii, jj, kk);
+                for (int idx=0; idx<(int)cell->points.size(); idx++) {
+                    GridPoint *gp = cell->points[idx];
+                    if (gp->id != ref) {
+                        glm::vec3 v = p->position - gp->position;
+                        if (glm::dot(v, v) < rsq) {
+                            objects.push_back(gp->id);
+                        }
+                    }
+                }
+            }
+
+        }
+      }
+    }
+
+    return objects;
+}
+
 void SpatialGrid::draw() {
+    if (points.size() == 0) { return; }
 
     glColor3f(1.0, 0.4, 0.0);
     glPointSize(6.0);
@@ -218,11 +266,12 @@ void SpatialGrid::draw() {
         utils::drawWireframeCube(pos, size);
     }
 
+    /*
     timespec ts_beg, ts_end;
     clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &ts_beg);
 
     float avg = 0;
-    double r = 2.0;
+    double r = 0.5;
     for (int i=0; i<(int)points.size(); i++) {
       GridPoint *p = points[i];
       std::vector<glm::vec3> objects = getObjectsInRadiusOfPoint(p->id, r);
@@ -232,7 +281,9 @@ void SpatialGrid::draw() {
 
     clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &ts_end);
 
-    qDebug() << "average neighbours" << avg << (ts_end.tv_sec - ts_beg.tv_sec) + (ts_end.tv_nsec - ts_beg.tv_nsec) / 1e9 << " sec";
+    qDebug() << "average neighbours" << avg << (ts_end.tv_sec - ts_beg.tv_sec) +
+                                (ts_end.tv_nsec - ts_beg.tv_nsec) / 1e9 << " sec";
+    */
 }
 
 

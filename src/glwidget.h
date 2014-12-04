@@ -66,6 +66,7 @@
 #include "camera3d.h"
 #include "utils.h"
 #include "spatialgrid.h"
+#include "sphfluidsimulation.h"
 
 class QtLogo;
 
@@ -110,7 +111,7 @@ private:
     void drawAnimation();
     void initializeSimulation();
     void stopSimulation();
-    bool saveFrameToFile(const char *fileName);
+    bool saveFrameToFile(QString fileName);
 
     // update/draw tiemrs
     QTimer *drawTimer;
@@ -137,9 +138,9 @@ private:
     float maxDeltaTimeModifier;
     float deltaTimeModifier;
     float runningTime;
+    int currentFrame;
 
-    SpatialGrid grid;
-    std::vector<std::tuple<int, glm::vec3, glm::vec3>> gridTest;
+    SPHFluidSimulation fluidSim;
 };
 
 #endif

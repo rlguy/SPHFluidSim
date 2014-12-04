@@ -17,7 +17,7 @@ public:
     void getGridCells(std::vector<GridCell*> *cells);
 
 private:
-    long computeHash(int i, int j, int k);
+    inline long computeHash(int i, int j, int k);
 
     long maxNumHashValues;
     std::unordered_map<long, std::vector<GridCell*>> cellMap;

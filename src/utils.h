@@ -7,7 +7,7 @@
 #include "camera3d.h"
 
 namespace utils {
-
+    void drawGrid();
     void drawWireframeCube(glm::vec3 pos, float size);
     void drawCircle(glm::vec3 pos, float r, glm::vec3 axis);
     void drawHalfCircle(glm::vec3 pos, float r,

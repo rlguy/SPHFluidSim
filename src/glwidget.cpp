@@ -117,7 +117,7 @@ GLWidget::GLWidget(QWidget *parent)
     srand(time(NULL));
     float max = 10.0;
 
-    int n = 100000;
+    int n = 10000;
     for (int i=0; i<n; i++) {
         float r = (float)rand() / (float)RAND_MAX;
         float x = r * max;
@@ -136,8 +136,6 @@ GLWidget::GLWidget(QWidget *parent)
         int ref = grid.insertPoint(p);
         gridTest.push_back(std::tuple<int,glm::vec3, glm::vec3>(ref, p, v));
     }
-
-    //grid.movePoint(ref, glm::vec3(5.0, 1.0, 1.0));
 
 }
 
@@ -291,6 +289,34 @@ void GLWidget::drawAnimation() {
 
 }
 
+bool GLWidget::saveFrameToFile(const char *fileName) {
+    GLubyte *data = (GLubyte*)malloc(4*(int)screenWidth*(int)screenHeight);
+    if( data ) {
+        glReadPixels(0, 0, screenWidth, screenHeight,
+                     GL_RGBA, GL_UNSIGNED_BYTE, data);
+    }
+
+    QImage image((int)screenWidth, (int)screenHeight, QImage::Format_RGB32);
+    for (int j=0; j<screenHeight; j++) {
+        for (int i=0; i<screenWidth; i++) {
+            int idx = 4*(j*screenWidth + i);
+            char r = data[idx+0];
+            char g = data[idx+1];
+            char b = data[idx+2];
+
+            // sets 32 bit pixel at (x,y) to yellow.
+            //uchar *p = image.scanLine(j) + i;
+            //*p = qRgb(255, 0, 0);
+            QRgb value = qRgb(r, g, b);
+            image.setPixel(i, screenHeight-j-1, value);
+        }
+    }
+    bool r = image.save(fileName);
+    free(data);
+
+    return r;
+}
+
 void GLWidget::paintGL()
 {
     camera.set();
@@ -307,6 +333,11 @@ void GLWidget::paintGL()
     glPopMatrix();
 
     camera.unset();
+
+
+    //saveFrameToFile("image_test2.png");
+    std::string s = "hello" + std::to_string(42);
+    qDebug() << QString::fromStdString(s);
 }
 
 void GLWidget::resizeGL(int width, int height)

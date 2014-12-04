@@ -61,6 +61,7 @@
 #include <tuple>
 #include <stdlib.h>     /* srand, rand */
 #include <time.h>       /* time */
+#include <QImage>
 #include "glm/glm.hpp"
 #include "camera3d.h"
 #include "utils.h"
@@ -109,6 +110,7 @@ private:
     void drawAnimation();
     void initializeSimulation();
     void stopSimulation();
+    bool saveFrameToFile(const char *fileName);
 
     // update/draw tiemrs
     QTimer *drawTimer;

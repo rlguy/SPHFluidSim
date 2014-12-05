@@ -77,7 +77,7 @@ GLWidget::GLWidget(QWidget *parent)
     float drawsPerSecond = 30;
 
     drawTimer = new QTimer(this);
-    connect(drawTimer, SIGNAL(timeout()), this, SLOT(updateGL()));
+    //connect(drawTimer, SIGNAL(timeout()), this, SLOT(updateGL()));
     drawTimer->start(1000.0/drawsPerSecond);
 
     updateTimer = new QTimer(this);
@@ -88,7 +88,7 @@ GLWidget::GLWidget(QWidget *parent)
     deltaTimer->start();
 
     // Initialize camera
-    glm::vec3 pos = glm::vec3(20.0, 5.0, 20.0);
+    glm::vec3 pos = glm::vec3(8.0, 3.0, 8.0);
     glm::vec3 dir = glm::normalize(glm::vec3(-pos.x, -pos.y, -pos.z));
     camera = camera3d(pos, dir, screenWidth, screenHeight,
                       60.0, 0.5, 100.0);
@@ -119,14 +119,15 @@ GLWidget::GLWidget(QWidget *parent)
     fluidSim = SPHFluidSimulation(radius);
 
     std::vector<glm::vec3> points;
-    int n = 15;
-    int ny = 100;
-    float pad = 1.0*radius;
-    float stagger = 0.00*radius;
-    glm::vec3 r = glm::vec3(1.0, 1.0, 1.0);
-    for (int k=0; k<n; k++) {
+    int nx = 10;
+    int ny = 10;
+    int nz = 6;
+    float pad = 0.9*radius;
+    float stagger = 0*radius;
+    glm::vec3 r = glm::vec3(1.0, 0.11, 1.0);
+    for (int k=0; k<nx; k++) {
         for (int j=0; j<ny; j++) {
-            for (int i=0; i<n; i++) {
+            for (int i=0; i<nz; i++) {
                 float sx = (2*((float)rand()/RAND_MAX)-1)*stagger;
                 float sy = (2*((float)rand()/RAND_MAX)-1)*stagger;
                 float sz = (2*((float)rand()/RAND_MAX)-1)*stagger;
@@ -208,6 +209,7 @@ void GLWidget::updateSimulation() {
 
     // fluidSim test
     fluidSim.update(dt);
+    updateGL();
 }
 
 
@@ -263,13 +265,14 @@ void GLWidget::paintGL()
 
 
 
+    /*
     std::string s = std::to_string(currentFrame);
     s.insert(s.begin(), 6 - s.size(), '0');
     s = "test_render/" + s + ".png";
     bool r = saveFrameToFile(QString::fromStdString(s));
 
     qDebug() << r << QString::fromStdString(s);
-
+    */
 
     currentFrame += 1;
 }

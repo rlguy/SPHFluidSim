@@ -9,9 +9,9 @@ SPHFluidSimulation::SPHFluidSimulation(double smoothingRadius)
 {
     initSmoothingRadius(smoothingRadius);
     grid = SpatialGrid(2*h);
-    gravityForce = glm::vec3(0.0, -3.0, 0.0);
+    gravityForce = glm::vec3(0.0, -2.0, 0.0);
 
-    double B = 200*initialDensity*glm::length(gravityForce)*maxDepth/ratioOfSpecificHeats;
+    double B = 10000;
     pressureStateCoefficient = B;
 }
 
@@ -78,15 +78,15 @@ inline double SPHFluidSimulation::evaluatePoly6Kernel(double rsq) {
 
 inline glm::vec3 SPHFluidSimulation::evaluateSpikeyGradKernel(
                                  double r, glm::vec3 pi, glm::vec3 pj) {
-    return (float)(spikeyGradCoefficient*(h-r)*(h-r))*(pi-pj);
+    return (float)(spikeyGradCoefficient*(h-r)*(h-r))*glm::normalize(pi-pj);
 }
 
 inline glm::vec3 SPHFluidSimulation::evaluateGradKernel(
                                  double r, glm::vec3 pi, glm::vec3 pj) {
     if (r <= h) {
-        return (float)(3*r*(3*r-4*h)/(4*3.141592653*h*h*h*h*h*h))*(pi-pj);
+        return (float)(3*r*(3*r-4*h)/(4*3.141592653*h*h*h*h*h*h))*glm::normalize(pi-pj);
     } else if (r <= 2*h) {
-        return (float)(-3*(r-2*h)*(r-2*h)/(4*3.141592653*h*h*h*h*h*h))*(pi-pj);
+        return (float)(-3*(r-2*h)*(r-2*h)/(4*3.141592653*h*h*h*h*h*h))*glm::normalize(pi-pj);
     }
 
     return glm::vec3(0.0, 0.0, 0.0);
@@ -114,6 +114,10 @@ inline double SPHFluidSimulation::evaluateSpeedOfSound(SPHParticle *sp) {
         sqr = -sqr;
     }
     return sqrt(sqr);
+}
+
+inline double SPHFluidSimulation::evaluateSpeedOfSoundSquared(SPHParticle *sp) {
+    return ratioOfSpecificHeats*(sp->pressure)/sp->density;
 }
 
 double SPHFluidSimulation::calculateViscosityTerm(SPHParticle *pi, SPHParticle *pj) {
@@ -165,8 +169,7 @@ double SPHFluidSimulation::calculateTimeStep() {
         sp = fluidParticles[i];
         double vsq = glm::dot(sp->velocity, sp->velocity);
         double asq = glm::dot(sp->acceleration, sp->acceleration);
-        double csq = sp->soundSpeed * sp->soundSpeed;
-
+        double csq = evaluateSpeedOfSoundSquared(sp);
         if (vsq > maxvsq) { maxvsq = vsq; }
         if (csq > maxcsq) { maxcsq = csq; }
         if (asq > maxasq) { maxasq = asq; }
@@ -308,12 +311,21 @@ void SPHFluidSimulation::updatePositionAndDensity(double dt) {
 void SPHFluidSimulation::update(float dt) {
     int numSteps = 0;
 
+    StopWatch t1 = StopWatch();
+    StopWatch t2 = StopWatch();
+
+    t1.start();
     double timeLeft = dt;
     while (timeLeft > 0.0) {
         updatePressure();
-        updateSpeedOfSound();
+
+        if (isViscosityEnabled) {
+            updateSpeedOfSound();
+        }
+        t2.start();
         updateGrid();
         updateNearestNeighbours();
+        t2.stop();
 
         updateAccelerationAndDensityRateOfChange();
         updateXSPHVelocity();
@@ -330,7 +342,11 @@ void SPHFluidSimulation::update(float dt) {
 
         updatePositionAndDensity((double)timeStep);
     }
-    qDebug() << numSteps;
+    //qDebug() << numSteps;
+    t1.stop();
+
+    //qDebug() << "update:" << t1.getTime() << "neighbours:" << t2.getTime() <<
+    //            "pct:" << (t2.getTime()/t1.getTime())*100.0;
 
 }
 
@@ -338,7 +354,7 @@ void SPHFluidSimulation::draw() {
     grid.draw();
 
     glColor3f(0.0, 0.3, 1.0);
-    glPointSize(3.0);
+    glPointSize(5.0);
     glBegin(GL_POINTS);
     for (uint i=0; i<fluidParticles.size(); i++) {
         glm::vec3 p = fluidParticles[i]->position;

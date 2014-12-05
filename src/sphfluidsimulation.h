@@ -10,6 +10,7 @@
 #include "glm/glm.hpp"
 #include "spatialgrid.h"
 #include "sphparticle.h"
+#include "stopwatch.h"
 
 class SPHFluidSimulation
 {
@@ -28,6 +29,7 @@ private:
     inline double evaluateKernel(double r);
     inline double evaluatePressureState(SPHParticle *sp);
     inline double evaluateSpeedOfSound(SPHParticle *sp);
+    inline double evaluateSpeedOfSoundSquared(SPHParticle *sp);
     double calculateViscosityTerm(SPHParticle *pi, SPHParticle *pj);
     void initSmoothingRadius(double h);
     SPHParticle* createSPHParticle(glm::vec3 pos, glm::vec3 velocity);
@@ -45,7 +47,7 @@ private:
     double hsq;                            // radius squared
     double physicalRadiusFactor = 0.5;
     double initialDensity = 1000.0;        // kg/m^3
-    double ratioOfSpecificHeats = 1.4;
+    double ratioOfSpecificHeats = 1.0;
     double maxDepth = 4.0;
     glm::vec3 gravityForce;
     double poly6Coefficient;
@@ -55,7 +57,7 @@ private:
     double courantSafetyFactor = 1.0;
     double minTimeStep = 1.0/240.0;
     bool isXSPHEnabled = true;
-    bool isViscosityEnabled = true;
+    bool isViscosityEnabled = false;
     double viscosityAlpha = 1;
     double viscosityBeta = 2;
 

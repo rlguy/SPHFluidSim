@@ -24,27 +24,40 @@ public:
 private:
     inline double evaluatePoly6Kernel(double rSquared);
     inline glm::vec3 evaluateSpikeyGradKernel(double r, glm::vec3 pi, glm::vec3 pj);
+    inline glm::vec3 evaluateGradKernel(double r, glm::vec3 pi, glm::vec3 pj);
+    inline double evaluateKernel(double r);
     inline double evaluatePressureState(SPHParticle *sp);
-    inline double evaluateSpeedOfSoundSquared(SPHParticle *sp);
+    inline double evaluateSpeedOfSound(SPHParticle *sp);
+    double calculateViscosityTerm(SPHParticle *pi, SPHParticle *pj);
     void initSmoothingRadius(double h);
     SPHParticle* createSPHParticle(glm::vec3 pos, glm::vec3 velocity);
 
     void updatePressure();
+    void updateSpeedOfSound();
     void updateGrid();
     void updateNearestNeighbours();
+    void updateAccelerationAndDensityRateOfChange();
+    void updateXSPHVelocity();
+    void updatePositionAndDensity(double dt);
     double calculateTimeStep();
 
     double h;                              // smoothing radius
     double hsq;                            // radius squared
     double physicalRadiusFactor = 0.5;
     double initialDensity = 1000.0;        // kg/m^3
-    double ratioOfSpecificHeats = 1.0;
+    double ratioOfSpecificHeats = 1.4;
     double maxDepth = 4.0;
     glm::vec3 gravityForce;
     double poly6Coefficient;
     double spikeyGradCoefficient;
     double pressureStateCoefficient;       // kg/m^2
+    double XSPHCoefficient = 0.25;
     double courantSafetyFactor = 1.0;
+    double minTimeStep = 1.0/240.0;
+    bool isXSPHEnabled = true;
+    bool isViscosityEnabled = true;
+    double viscosityAlpha = 1;
+    double viscosityBeta = 2;
 
     SpatialGrid grid;
     std::vector<SPHParticle*> fluidParticles;

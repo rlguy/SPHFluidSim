@@ -10,12 +10,17 @@
 struct SPHParticle {
     glm::vec3 position;
     glm::vec3 velocity;
+    glm::vec3 velocityAtHalfTimeStep;
+    glm::vec3 XSPHVelocity;
     glm::vec3 acceleration;
+    double soundSpeed;
     double mass;
     double density;
+    double densityVelocity;
     double pressure;
     std::vector<SPHParticle*> neighbours;
     int gridID;  // used for spatial grid lookup
+    bool isHalfTimeStepVelocityInitialized;
 };
 
 

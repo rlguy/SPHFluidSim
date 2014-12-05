@@ -39,7 +39,7 @@ void SpatialGrid::positionToIJK(glm::vec3 p, int *i, int *j, int *k) {
     *j = ceil(p.y*inv)-1;
     *k = ceil(p.z*inv)-1;
 
-    double eps = 0.0000000001;
+    double eps = 0.00000000001;
     if (fabs(fmod(p.x, size)) < eps) {
         *i = *i + 1;
     }
@@ -121,30 +121,58 @@ void SpatialGrid::movePoint(int id, glm::vec3 newPos) {
         int nexti, nextj, nextk;
         positionToIJK(point->position, &nexti, &nextj, &nextk);
 
-        // remove grid point from old cell
-        GridCell *oldCell = cellHashTable.getGridCell(i, j, k);
-        oldCell->removeGridPoint(point);
+        // verify that point has moved to new cell
+        if (!(i==nexti && j == nextj && k == nextk)) {
+            // remove grid point from old cell
+            GridCell *oldCell = cellHashTable.getGridCell(i, j, k);
+            oldCell->removeGridPoint(point);
 
-        // remove cell from hash if empty
-        if (oldCell->isEmpty()) {
-            cellHashTable.removeGridCell(i, j, k);
-            oldCell->reset();
-            freeCells.push_back(oldCell);
-        }
+            // remove cell from hash if empty
+            if (oldCell->isEmpty()) {
+                cellHashTable.removeGridCell(i, j, k);
+                oldCell->reset();
+                freeCells.push_back(oldCell);
+            }
 
-        // insert into new cell
-        bool isCellInTable = cellHashTable.isGridCellInHash(nexti, nextj, nextk);
-        if (isCellInTable) {
-            GridCell *cell = cellHashTable.getGridCell(nexti, nextj, nextk);
-            cell->insertGridPoint(point);
+            // insert into new cell
+            bool isCellInTable = cellHashTable.isGridCellInHash(nexti, nextj, nextk);
+            if (isCellInTable) {
+                GridCell *cell = cellHashTable.getGridCell(nexti, nextj, nextk);
+                cell->insertGridPoint(point);
+            } else {
+                GridCell *cell = getNewGridCell();
+                cell->initialize(nexti, nextj, nextk);
+                cell->insertGridPoint(point);
+                cellHashTable.insertGridCell(nexti, nextj, nextk, cell);
+            }
+
+            updateGridPointCellOffset(point, nexti, nextj, nextk);
         } else {
-            GridCell *cell = getNewGridCell();
-            cell->initialize(nexti, nextj, nextk);
-            cell->insertGridPoint(point);
-            cellHashTable.insertGridCell(nexti, nextj, nextk, cell);
-        }
+            //debug
+            /*
+            qDebug() << point->position.x <<
+                        point->position.y <<
+                        point->position.z <<
+                        point->tx <<
+                        point->ty <<
+                        point->tz << i << j << k << nexti << nextj << nextk;
+            positionToIJK(point->position, &nexti, &nextj, &nextk);
+            qDebug() << nexti << nextj << nextk <<
+                        newPos.x << newPos.y << newPos.z <<
+                        trans.x << trans.y << trans.z;
+            qDebug() << cellHashTable.isGridCellInHash(i, j, k);
+            */
 
-        updateGridPointCellOffset(point, nexti, nextj, nextk);
+            // Current work around for a bug where point may not belong to the
+            // grid cell at it's current position
+            if (!cellHashTable.isGridCellInHash(i, j, k)) {
+                GridCell *cell = getNewGridCell();
+                cell->initialize(i, j, k);
+                cell->insertGridPoint(point);
+                cellHashTable.insertGridCell(nexti, nextj, nextk, cell);
+                updateGridPointCellOffset(point, nexti, nextj, nextk);
+            }
+        }
     }
 }
 
@@ -218,16 +246,19 @@ std::vector<int> SpatialGrid::getIDsInRadiusOfPoint(int ref, double r) {
     int jmax = j + fmax(0, ceil((r-size+ty)*inv));
     int kmax = k + fmax(0, ceil((r-size+tz)*inv));
 
+    GridPoint *gp;
+    GridCell *cell;
+    glm::vec3 v;
     for (int ii=imin; ii<=imax; ii++) {
       for (int jj=jmin; jj<=jmax; jj++) {
         for (int kk=kmin; kk<=kmax; kk++) {
 
             if (cellHashTable.isGridCellInHash(ii, jj, kk)) {
-                GridCell *cell = cellHashTable.getGridCell(ii, jj, kk);
+                cell = cellHashTable.getGridCell(ii, jj, kk);
                 for (int idx=0; idx<(int)cell->points.size(); idx++) {
-                    GridPoint *gp = cell->points[idx];
+                    gp = cell->points[idx];
                     if (gp->id != ref) {
-                        glm::vec3 v = p->position - gp->position;
+                        v = p->position - gp->position;
                         if (glm::dot(v, v) < rsq) {
                             objects.push_back(gp->id);
                         }

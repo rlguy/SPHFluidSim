@@ -55,6 +55,7 @@
 #include <QtWidgets>
 #include <QtOpenGL>
 #include <QCursor>
+#include <GL/glu.h>
 #include "glwidget.h"
 #include "glm/glm.hpp"
 #include "quaternion.h"
@@ -87,8 +88,8 @@ GLWidget::GLWidget(QWidget *parent)
     deltaTimer->start();
 
     // Initialize camera
-    glm::vec3 pos = glm::vec3(16.88, 11.82, 11.41);
-    glm::vec3 dir = glm::vec3(-0.828, -0.472, -0.302);
+    glm::vec3 pos = glm::vec3(20.0, 5.0, 20.0);
+    glm::vec3 dir = glm::normalize(glm::vec3(-pos.x, -pos.y, -pos.z));
     camera = camera3d(pos, dir, screenWidth, screenHeight,
                       60.0, 0.5, 100.0);
 
@@ -114,17 +115,24 @@ GLWidget::GLWidget(QWidget *parent)
     currentFrame = 0;
 
 
-    double radius = 0.2;
+    double radius = 0.08;
     fluidSim = SPHFluidSimulation(radius);
 
     std::vector<glm::vec3> points;
-    int n = 10;
-    float pad = 0.5*radius;
-    glm::vec3 r = glm::vec3(2.0, 1.0, 2.0);
+    int n = 15;
+    int ny = 100;
+    float pad = 1.0*radius;
+    float stagger = 0.00*radius;
+    glm::vec3 r = glm::vec3(1.0, 1.0, 1.0);
     for (int k=0; k<n; k++) {
-        for (int j=0; j<n; j++) {
+        for (int j=0; j<ny; j++) {
             for (int i=0; i<n; i++) {
-                glm::vec3 p = r + glm::vec3(i*pad, j*pad, k*pad);
+                float sx = (2*((float)rand()/RAND_MAX)-1)*stagger;
+                float sy = (2*((float)rand()/RAND_MAX)-1)*stagger;
+                float sz = (2*((float)rand()/RAND_MAX)-1)*stagger;
+
+                glm::vec3 p;
+                p = r + glm::vec3(i*pad+sx, j*pad+sy, k*pad+sz);
                 points.push_back(p);
             }
         }
@@ -254,14 +262,14 @@ void GLWidget::paintGL()
     camera.unset();
 
 
-    /*
+
     std::string s = std::to_string(currentFrame);
     s.insert(s.begin(), 6 - s.size(), '0');
     s = "test_render/" + s + ".png";
     bool r = saveFrameToFile(QString::fromStdString(s));
 
     qDebug() << r << QString::fromStdString(s);
-    */
+
 
     currentFrame += 1;
 }

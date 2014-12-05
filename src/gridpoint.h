@@ -10,4 +10,6 @@ struct GridPoint {
     glm::vec3 position;
     int id;
     double tx, ty, tz;
+    int i, j, k;
+    bool isInGridCell = false;
 };

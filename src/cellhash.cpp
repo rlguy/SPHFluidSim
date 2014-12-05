@@ -9,8 +9,8 @@ inline long CellHash::computeHash(int i, int j, int k) {
     return (abs(541*(long)i + 79*(long)j + 31*(long)k) % maxNumHashValues);
 }
 
-void CellHash::insertGridCell(int i, int j, int k, GridCell *cell) {
-    long h = computeHash(i, j, k);
+void CellHash::insertGridCell(GridCell *cell) {
+    long h = computeHash(cell->i, cell->j, cell->k);
 
     if (cellMap.find(h) == cellMap.end()) {
         std::vector<GridCell*> newChain;
@@ -21,21 +21,31 @@ void CellHash::insertGridCell(int i, int j, int k, GridCell *cell) {
     cellMap[h].push_back(cell);
 }
 
-void CellHash::removeGridCell(int i, int j, int k) {
+void CellHash::removeGridCell(GridCell *cell) {
+    int i = cell->i;
+    int j = cell->j;
+    int k = cell->k;
     long h = computeHash(i, j, k);
 
     if (cellMap.find(h) == cellMap.end()) {
+        qDebug() << "cant find cell" << i << j << k << h;
         return;
     }
 
     // remove from hash chain
+    bool isRemoved = false;
     std::vector<GridCell*> chain = cellMap[h];
     for (int idx=0; idx<(int)chain.size(); idx++) {
         GridCell *c = (cellMap[h])[idx];
         if (c->i == i && c->j == j && c->k == k) {
             cellMap[h].erase(cellMap[h].begin() + idx);
+            isRemoved = true;
             break;
         }
+    }
+
+    if (!isRemoved) {
+        qDebug() << "Could not find/remove gridcell" << i << j << k;
     }
 
     // remove chain from map if empty

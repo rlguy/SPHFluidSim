@@ -29,7 +29,7 @@ private:
     void insertGridPointIntoGrid(GridPoint *p);
     void positionToIJK(glm::vec3 p, int *i, int *j, int *k);
     glm::vec3 IJKToPosition(int i, int j, int k);
-    GridCell* getNewGridCell();
+    GridCell* getNewGridCell(int i, int j, int k);
     void updateGridPointCellOffset(GridPoint *gp, int i, int j, int k);
 
     double size;

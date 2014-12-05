@@ -16,8 +16,11 @@ public:
     void insertGridPoint(GridPoint *gp);
     void removeGridPoint(GridPoint *gp);
     bool isEmpty();
+    std::vector<GridPoint*> getGridPoints();
 
     int i, j, k;
+
+private:
     std::vector<GridPoint*> points;
 };
 

@@ -11,8 +11,8 @@ class CellHash
 public:
     CellHash();
     bool isGridCellInHash(int i, int j, int k);
-    void insertGridCell(int i, int j, int k, GridCell *cell);
-    void removeGridCell(int i, int j, int k);
+    void insertGridCell(GridCell *cell);
+    void removeGridCell(GridCell *cell);
     GridCell* getGridCell(int i, int j, int k);
     void getGridCells(std::vector<GridCell*> *cells);
 

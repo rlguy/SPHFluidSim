@@ -45,7 +45,7 @@ private:
 
     double h;                              // smoothing radius
     double hsq;                            // radius squared
-    double physicalRadiusFactor = 0.5;
+    double physicalRadiusFactor = 0.4;
     double initialDensity = 1000.0;        // kg/m^3
     double ratioOfSpecificHeats = 1.0;
     double maxDepth = 4.0;
@@ -56,10 +56,13 @@ private:
     double XSPHCoefficient = 0.25;
     double courantSafetyFactor = 1.0;
     double minTimeStep = 1.0/240.0;
-    bool isXSPHEnabled = true;
+    bool isXSPHEnabled = false;
     bool isViscosityEnabled = false;
     double viscosityAlpha = 1;
     double viscosityBeta = 2;
+
+    double maximumAcceleration = 250.0;
+    double maximumVelocity = 100.0;
 
     SpatialGrid grid;
     std::vector<SPHParticle*> fluidParticles;

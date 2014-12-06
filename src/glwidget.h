@@ -111,6 +111,7 @@ private:
     void drawAnimation();
     void initializeSimulation();
     void stopSimulation();
+    void writeFrame();
     bool saveFrameToFile(QString fileName);
 
     // update/draw tiemrs

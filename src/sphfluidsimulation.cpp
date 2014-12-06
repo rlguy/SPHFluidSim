@@ -9,7 +9,7 @@ SPHFluidSimulation::SPHFluidSimulation(double smoothingRadius)
 {
     initSmoothingRadius(smoothingRadius);
     grid = SpatialGrid(2*h);
-    gravityForce = glm::vec3(0.0, -2.0, 0.0);
+    gravityForce = glm::vec3(0.0, -4.0, 0.0);
 
     double B = 10000;
     pressureStateCoefficient = B;
@@ -117,6 +117,9 @@ inline double SPHFluidSimulation::evaluateSpeedOfSound(SPHParticle *sp) {
 }
 
 inline double SPHFluidSimulation::evaluateSpeedOfSoundSquared(SPHParticle *sp) {
+    if (sp->density < 0.00001) {
+        return 0.0;
+    }
     return ratioOfSpecificHeats*(sp->pressure)/sp->density;
 }
 
@@ -132,6 +135,10 @@ double SPHFluidSimulation::calculateViscosityTerm(SPHParticle *pi, SPHParticle *
     double u = h*dot / (glm::dot(pdiff, pdiff) + 0.01*h*h);
     double meanc = 0.5 * (pi->soundSpeed + pj->soundSpeed);
     double meanp = 0.5 * (pi->density + pj->density);
+
+    if (meanp < 0.00001 ) {
+        return 0.0;
+    }
 
     return -(viscosityAlpha*meanc*u + viscosityBeta*u*u) /  meanp;
 }
@@ -158,6 +165,8 @@ void SPHFluidSimulation::updateGrid() {
         sp = fluidParticles[i];
         grid.movePoint(sp->gridID, sp->position);
     }
+
+    grid.update();
 }
 
 double SPHFluidSimulation::calculateTimeStep() {
@@ -183,6 +192,8 @@ double SPHFluidSimulation::calculateTimeStep() {
     double cStep = courantSafetyFactor*h / maxc;
     double aStep = sqrt(h/maxa);
     double tempMin = fmin(vStep, cStep);
+
+    qDebug() << maxv << maxa << maxc;
 
     return fmax(minTimeStep, fmin(tempMin, aStep));
 }
@@ -229,8 +240,12 @@ void SPHFluidSimulation::updateAccelerationAndDensityRateOfChange() {
             dp += glm::dot((float)pj->mass*(pi->velocity - pj->velocity), w);
         }
         pi->acceleration = -acc + gravityForce;
-        //pi->acceleration = -acc;
         pi->densityVelocity = dp;
+
+        if (glm::length(pi->acceleration) > maximumAcceleration) {
+            glm::vec3 unit = glm::normalize(pi->acceleration);
+            pi->acceleration = (float)maximumAcceleration*unit;
+        }
     }
 }
 
@@ -281,6 +296,10 @@ void SPHFluidSimulation::updatePositionAndDensity(double dt) {
 
         // update sph velocity by advancing half time step velocty by 1/2 interval
         p->velocity = p->velocityAtHalfTimeStep + (float)(0.5*dt) * p->acceleration;
+        if (glm::length(p->velocity) > maximumVelocity) {
+            glm::vec3 unit = glm::normalize(p->velocity);
+            p->velocity = (float)maximumVelocity*unit;
+        }
 
         // update density
         p->density += (float)dt * p->densityVelocity;
@@ -328,7 +347,10 @@ void SPHFluidSimulation::update(float dt) {
         t2.stop();
 
         updateAccelerationAndDensityRateOfChange();
-        updateXSPHVelocity();
+
+        if (isXSPHEnabled) {
+            updateXSPHVelocity();
+        }
 
         // calculate next time step
         double timeStep = calculateTimeStep();
@@ -345,8 +367,8 @@ void SPHFluidSimulation::update(float dt) {
     //qDebug() << numSteps;
     t1.stop();
 
-    //qDebug() << "update:" << t1.getTime() << "neighbours:" << t2.getTime() <<
-    //            "pct:" << (t2.getTime()/t1.getTime())*100.0;
+    qDebug() << "update:" << t1.getTime() << "neighbours:" << t2.getTime() <<
+                "pct:" << (t2.getTime()/t1.getTime())*100.0;
 
 }
 

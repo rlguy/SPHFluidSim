@@ -21,6 +21,7 @@ public:
     void movePoint(int id, glm::vec3 position);
     std::vector<glm::vec3> getObjectsInRadiusOfPoint(int ref, double radius);
     std::vector<int> getIDsInRadiusOfPoint(int ref, double radius);
+    void update();
     void draw();
 
 private:
@@ -31,6 +32,7 @@ private:
     glm::vec3 IJKToPosition(int i, int j, int k);
     GridCell* getNewGridCell(int i, int j, int k);
     void updateGridPointCellOffset(GridPoint *gp, int i, int j, int k);
+    std::vector<int> fastIDNeighbourSearch(int ref, double r, GridPoint *gp);
 
     double size;
     int currentGridPointID;

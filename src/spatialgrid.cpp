@@ -74,12 +74,12 @@ void SpatialGrid::insertGridPointIntoGrid(GridPoint *p) {
     int i, j, k;
     positionToIJK(p->position, &i, &j, &k);
 
-    bool isCellInTable = cellHashTable.isGridCellInHash(i, j, k);
+    bool isCellInTable = false;
+    GridCell *cell = cellHashTable.findGridCell(i, j, k, &isCellInTable);
     if (isCellInTable) {
-        GridCell *cell = cellHashTable.getGridCell(i, j, k);
         cell->insertGridPoint(p);
     } else {
-        GridCell *cell = getNewGridCell(i, j ,k);
+        cell = getNewGridCell(i, j ,k);
         cell->insertGridPoint(p);
         cellHashTable.insertGridCell(cell);
     }
@@ -135,9 +135,9 @@ void SpatialGrid::movePoint(int id, glm::vec3 newPos) {
         }
 
         // insert into new cell
-        bool isCellInTable = cellHashTable.isGridCellInHash(nexti, nextj, nextk);
+        bool isCellInTable = false;
+        GridCell *cell = cellHashTable.findGridCell(nexti, nextj, nextk, &isCellInTable);
         if (isCellInTable) {
-            GridCell *cell = cellHashTable.getGridCell(nexti, nextj, nextk);
             cell->insertGridPoint(point);
         } else {
             GridCell *cell = getNewGridCell(nexti, nextj, nextk);
@@ -172,18 +172,22 @@ std::vector<glm::vec3> SpatialGrid::getObjectsInRadiusOfPoint(int ref, double r)
     int jmax = j + fmax(0, ceil((r-size+ty)*inv));
     int kmax = k + fmax(0, ceil((r-size+tz)*inv));
 
+    GridCell *cell;
+    GridPoint *gp;
+    glm::vec3 v;
     std::vector<GridPoint*> points;
     for (int ii=imin; ii<=imax; ii++) {
       for (int jj=jmin; jj<=jmax; jj++) {
         for (int kk=kmin; kk<=kmax; kk++) {
 
-            if (cellHashTable.isGridCellInHash(ii, jj, kk)) {
-                GridCell *cell = cellHashTable.getGridCell(ii, jj, kk);
+            bool isInHash = false;
+            cell = cellHashTable.findGridCell(ii, jj, kk, &isInHash);
+            if (isInHash) {
                 points = cell->getGridPoints();
                 for (int idx=0; idx<(int)points.size(); idx++) {
-                    GridPoint *gp = points[idx];
+                    gp = points[idx];
                     if (gp->id != ref) {
-                        glm::vec3 v = p->position - gp->position;
+                        v = p->position - gp->position;
                         if (glm::dot(v, v) < rsq) {
                             objects.push_back(gp->position);
                         }
@@ -198,10 +202,48 @@ std::vector<glm::vec3> SpatialGrid::getObjectsInRadiusOfPoint(int ref, double r)
     return objects;
 }
 
-std::vector<int> SpatialGrid::getIDsInRadiusOfPoint(int ref, double r) {
+std::vector<int> SpatialGrid::fastIDNeighbourSearch(int ref, double r, GridPoint *p) {
     std::vector<int> objects;
 
+    bool isInHash = false;
+    GridCell *cell = cellHashTable.findGridCell(p->i, p->j, p->k, &isInHash);
+    if (!isInHash) {
+        return objects;
+    }
+
+    std::vector<GridPoint*> points = cell->getGridPoints();
+    GridPoint *gp;
+    glm::vec3 v;
+    double rsq = r*r;
+    for (uint i=0; i<points.size(); i++) {
+        gp = points[i];
+        if (gp->id != ref) {
+            v = p->position - gp->position;
+            if (glm::dot(v, v) < rsq) {
+                objects.push_back(gp->id);
+            }
+        }
+    }
+
+    std::vector<GridCell*> neighbours = cell->neighbours;
+    for (uint i=0; i<neighbours.size(); i++) {
+        points = neighbours[i]->getGridPoints();
+        for (uint j=0; j<points.size(); j++) {
+            gp = points[j];
+            v = p->position - gp->position;
+            if (glm::dot(v, v) < rsq) {
+                objects.push_back(gp->id);
+            }
+        }
+    }
+
+    return objects;
+}
+
+std::vector<int> SpatialGrid::getIDsInRadiusOfPoint(int ref, double r) {
+
     if (gridPointsByID.find(ref) == gridPointsByID.end()) {
+        std::vector<int> objects;
         return objects;
     }
 
@@ -221,6 +263,12 @@ std::vector<int> SpatialGrid::getIDsInRadiusOfPoint(int ref, double r) {
     int jmax = j + fmax(0, ceil((r-size+ty)*inv));
     int kmax = k + fmax(0, ceil((r-size+tz)*inv));
 
+    if (imax - imin <= 3 and imax - imin >= 1) {
+        return fastIDNeighbourSearch(ref, r, p);
+    }
+    qDebug() << imax - imin;
+
+    std::vector<int> objects;
     GridPoint *gp;
     GridCell *cell;
     glm::vec3 v;
@@ -229,8 +277,9 @@ std::vector<int> SpatialGrid::getIDsInRadiusOfPoint(int ref, double r) {
       for (int jj=jmin; jj<=jmax; jj++) {
         for (int kk=kmin; kk<=kmax; kk++) {
 
-            if (cellHashTable.isGridCellInHash(ii, jj, kk)) {
-                cell = cellHashTable.getGridCell(ii, jj, kk);
+            bool isInHash = false;
+            cell = cellHashTable.findGridCell(ii, jj, kk, &isInHash);
+            if (isInHash) {
                 points = cell->getGridPoints();
                 for (int idx=0; idx<(int)points.size(); idx++) {
                     gp = points[idx];
@@ -248,6 +297,38 @@ std::vector<int> SpatialGrid::getIDsInRadiusOfPoint(int ref, double r) {
     }
 
     return objects;
+}
+
+void SpatialGrid::update() {
+    // update each cell's cell neighbours
+    std::vector<GridCell*> cells;
+    cellHashTable.getGridCells(&cells);
+
+    GridCell* cell;
+    GridCell* gc;
+    for (uint idx=0; idx<cells.size(); idx++) {
+        cell = cells[idx];
+        cell->neighbours.clear();
+
+        int ii = cell->i;
+        int jj = cell->j;
+        int kk = cell->k;
+
+        for (int k=kk-1; k<=kk+1; k++) {
+            for (int j=jj-1; j<=jj+1; j++) {
+                for (int i=ii-1; i<=ii+1; i++) {
+                    if (!(i==ii && j==jj && k==kk)) {
+                        bool isInTable = false;
+                        gc = cellHashTable.findGridCell(i, j, k, &isInTable);
+                        if (isInTable) {
+                            cell->neighbours.push_back(gc);
+                        }
+                    }
+                }
+            }
+        }
+
+    }
 }
 
 void SpatialGrid::draw() {

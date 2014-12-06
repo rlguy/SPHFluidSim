@@ -18,6 +18,7 @@ public:
     bool isEmpty();
     std::vector<GridPoint*> getGridPoints();
 
+    std::vector<GridCell*> neighbours;
     int i, j, k;
 
 private:

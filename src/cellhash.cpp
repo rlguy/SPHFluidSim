@@ -70,6 +70,23 @@ GridCell* CellHash::getGridCell(int i, int j, int k) {
     return c;
 }
 
+GridCell* CellHash::findGridCell(int i, int j, int k, bool *isGridCellFound) {
+    long h = computeHash(i, j, k);
+
+    GridCell *c;
+    std::vector<GridCell*> chain = cellMap[h];
+    for (int idx=0; idx<(int)chain.size(); idx++) {
+        c = chain[idx];
+        if (c->i == i && c->j == j and c->k == k) {
+            *isGridCellFound = true;
+            return c;
+        }
+    }
+
+    *isGridCellFound = false;
+    return c;
+}
+
 bool CellHash::isGridCellInHash(int i, int j, int k) {
     long h = computeHash(i, j, k);
 
@@ -88,6 +105,8 @@ bool CellHash::isGridCellInHash(int i, int j, int k) {
 
     return false;
 }
+
+
 
 void CellHash::getGridCells(std::vector<GridCell*> *cells) {
     for (std::pair<int, std::vector<GridCell*>> pair: cellMap) {

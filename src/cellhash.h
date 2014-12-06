@@ -14,6 +14,7 @@ public:
     void insertGridCell(GridCell *cell);
     void removeGridCell(GridCell *cell);
     GridCell* getGridCell(int i, int j, int k);
+    GridCell* findGridCell(int i, int j, int k, bool *isGridCellFound);
     void getGridCells(std::vector<GridCell*> *cells);
 
 private:

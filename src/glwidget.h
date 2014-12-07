@@ -62,6 +62,7 @@
 #include <stdlib.h>     /* srand, rand */
 #include <time.h>       /* time */
 #include <QImage>
+#include "SOIL/src/SOIL.h"
 #include "glm/glm.hpp"
 #include "camera3d.h"
 #include "utils.h"
@@ -113,6 +114,7 @@ private:
     void stopSimulation();
     void writeFrame();
     bool saveFrameToFile(QString fileName);
+    bool isRendering = false;
 
     // update/draw tiemrs
     QTimer *drawTimer;

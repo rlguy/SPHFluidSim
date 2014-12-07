@@ -266,7 +266,7 @@ std::vector<int> SpatialGrid::getIDsInRadiusOfPoint(int ref, double r) {
     if (imax - imin <= 3 and imax - imin >= 1) {
         return fastIDNeighbourSearch(ref, r, p);
     }
-    qDebug() << imax - imin;
+    qDebug() << p->position.x << p->position.y << p->position.z << ref;
 
     std::vector<int> objects;
     GridPoint *gp;

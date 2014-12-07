@@ -83,7 +83,7 @@ GLWidget::GLWidget(QWidget *parent)
     deltaTimer->start();
 
     // Initialize camera
-    glm::vec3 pos = glm::vec3(25.0, 10.0, 25.0);
+    glm::vec3 pos = glm::vec3(12, 10.0, 12);
     glm::vec3 dir = glm::normalize(glm::vec3(-pos.x, -pos.y, -pos.z));
     camera = camera3d(pos, dir, screenWidth, screenHeight,
                       60.0, 0.5, 100.0);
@@ -110,16 +110,16 @@ GLWidget::GLWidget(QWidget *parent)
     currentFrame = 0;
 
 
-    double radius = 0.08;
+    double radius = 0.1;
     fluidSim = SPHFluidSimulation(radius);
 
     std::vector<glm::vec3> points;
-    int nx = 25;
-    int ny = 80;
-    int nz = 25;
+    int nx = 20;
+    int ny = 20;
+    int nz = 10;
     float pad = 1.05*radius;
     float stagger = 0.1*radius;
-    glm::vec3 r = glm::vec3(1.0, 0.11, 1.0);
+    glm::vec3 r = glm::vec3(0.1, 0.1, 0.1);
     for (int k=0; k<nz; k++) {
         for (int j=0; j<ny; j++) {
             for (int i=0; i<nx; i++) {
@@ -130,13 +130,60 @@ GLWidget::GLWidget(QWidget *parent)
                 glm::vec3 p;
                 p = r + glm::vec3(i*pad+sx, j*pad+sy, k*pad+sz);
                 points.push_back(p);
-
-                //p = r + glm::vec3(i*pad+sx + 3.5, j*pad+sy, k*pad+sz);
-                //points.push_back(p);
             }
         }
     }
     fluidSim.addFluidParticles(points);
+
+    fluidSim.setBounds(0.0, 2.0, 0.0, 8.0, 0.0, 1.0);
+
+    /*
+    nx = 100;
+    ny = 30;
+    nz = 8;
+    pad = 0.6*radius;
+    std::vector<glm::vec3> obstaclePoints;
+    r = glm::vec3(0.0, -0.1, 3.0);
+    for (int k=0; k<nz; k++) {
+        for (int j=0; j<ny; j++) {
+            for (int i=0; i<nx; i++) {
+                glm::vec3 p;
+                p = r + glm::vec3(i*pad, j*pad, k*pad);
+                obstaclePoints.push_back(p);
+                p = r + glm::vec3(i*pad + 0.5*pad, j*pad + 0.5*pad, k*pad + 0.5*pad);
+                obstaclePoints.push_back(p);
+
+                p = r + glm::vec3(i*pad, j*pad, k*pad -3.0);
+                obstaclePoints.push_back(p);
+                p = r + glm::vec3(i*pad + 0.5*pad, j*pad + 0.5*pad, k*pad + 0.5*pad-3.0);
+                obstaclePoints.push_back(p);
+            }
+        }
+    }
+
+    nx = 8;
+    ny = 30;
+    nz = 70;
+    r = glm::vec3(0.0, -0.1, 0.3);
+    for (int k=0; k<nz; k++) {
+        for (int j=0; j<ny; j++) {
+            for (int i=0; i<nx; i++) {
+                glm::vec3 p;
+                p = r + glm::vec3(i*pad, j*pad, k*pad);
+                obstaclePoints.push_back(p);
+                p = r + glm::vec3(i*pad + 0.5*pad, j*pad + 0.5*pad, k*pad + 0.5*pad);
+                obstaclePoints.push_back(p);
+
+                p = r + glm::vec3(i*pad+4.0, j*pad, k*pad);
+                obstaclePoints.push_back(p);
+                p = r + glm::vec3(i*pad + 0.5*pad + 4.0, j*pad + 0.5*pad, k*pad + 0.5*pad);
+                obstaclePoints.push_back(p);
+            }
+        }
+    }
+    int id = fluidSim.addObstacleParticles(obstaclePoints);
+    */
+
 
 }
 
@@ -207,7 +254,11 @@ void GLWidget::updateSimulation() {
 
     // fluidSim test
     fluidSim.update(dt);
-    writeFrame();
+    if (isRendering) {
+        writeFrame();
+    } else {
+        updateGL();
+    }
 }
 
 void GLWidget::writeFrame() {
@@ -326,6 +377,13 @@ void GLWidget::keyReleaseEvent(QKeyEvent *event)
     if (event->key() == Qt::Key_C) {
         deltaTimeModifier = maxDeltaTimeModifier;
     }
+
+    if (event->key() == Qt::Key_G) {
+        fluidSim.setDampingConstant(0.5);
+        fluidSim.setBounds(0.0, 2.0, 0.0, 8.0, 0.0, 6.0);
+        isRendering = true;
+    }
+
 }
 
 void GLWidget::mousePressEvent(QMouseEvent *event)

@@ -21,6 +21,7 @@ struct SPHParticle {
     std::vector<SPHParticle*> neighbours;
     int gridID;  // used for spatial grid lookup
     bool isHalfTimeStepVelocityInitialized;
+    bool isObstacle;
 };
 
 

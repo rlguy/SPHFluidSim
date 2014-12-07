@@ -98,6 +98,44 @@ namespace utils {
         glEnd();
     }
 
+    void drawWireframeCube(glm::vec3 pos, float width, float height, float depth) {
+        float hw = 0.5*width;
+        float hh = 0.5*height;
+        float hd = 0.5*depth;
+
+        glBegin(GL_LINES);
+        glVertex3f(pos.x - hw, pos.y - hh, pos.z - hd);
+        glVertex3f(pos.x + hw, pos.y - hh, pos.z - hd);
+        glVertex3f(pos.x - hw, pos.y - hh, pos.z - hd);
+        glVertex3f(pos.x - hw, pos.y + hh, pos.z - hd);
+        glVertex3f(pos.x - hw, pos.y - hh, pos.z - hd);
+        glVertex3f(pos.x - hw, pos.y - hh, pos.z + hd);
+
+        glVertex3f(pos.x + hw, pos.y + hh, pos.z + hd);
+        glVertex3f(pos.x - hw, pos.y + hh, pos.z + hd);
+        glVertex3f(pos.x + hw, pos.y + hh, pos.z + hd);
+        glVertex3f(pos.x + hw, pos.y - hh, pos.z + hd);
+        glVertex3f(pos.x + hw, pos.y + hh, pos.z + hd);
+        glVertex3f(pos.x + hw, pos.y + hh, pos.z - hd);
+
+        glVertex3f(pos.x - hw, pos.y + hh, pos.z + hd);
+        glVertex3f(pos.x - hw, pos.y - hh, pos.z + hd);
+        glVertex3f(pos.x - hw, pos.y + hh, pos.z + hd);
+        glVertex3f(pos.x - hw, pos.y + hh, pos.z - hd);
+
+        glVertex3f(pos.x + hw, pos.y - hh, pos.z + hd);
+        glVertex3f(pos.x - hw, pos.y - hh, pos.z + hd);
+        glVertex3f(pos.x + hw, pos.y - hh, pos.z + hd);
+        glVertex3f(pos.x + hw, pos.y - hh, pos.z - hd);
+
+        glVertex3f(pos.x + hw, pos.y + hh, pos.z - hd);
+        glVertex3f(pos.x + hw, pos.y - hh, pos.z - hd);
+        glVertex3f(pos.x + hw, pos.y + hh, pos.z - hd);
+        glVertex3f(pos.x - hw, pos.y + hh, pos.z - hd);
+
+        glEnd();
+    }
+
     // draw a circle around position pos with radius r around axis vector
     void drawCircle(glm::vec3 pos, float r, glm::vec3 axis) {
         glm::vec3 v1 = glm::normalize(glm::vec3(-axis.y, axis.x, 0.0));

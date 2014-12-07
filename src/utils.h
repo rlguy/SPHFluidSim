@@ -9,6 +9,7 @@
 namespace utils {
     void drawGrid();
     void drawWireframeCube(glm::vec3 pos, float size);
+    void drawWireframeCube(glm::vec3 pos, float width, float height, float depth);
     void drawCircle(glm::vec3 pos, float r, glm::vec3 axis);
     void drawHalfCircle(glm::vec3 pos, float r,
                         glm::vec3 axis, glm::vec3 plane);

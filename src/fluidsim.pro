@@ -13,7 +13,8 @@ HEADERS       = glwidget.h \
     gridpoint.h \
     sphfluidsimulation.h \
     sphparticle.h \
-    stopwatch.h
+    stopwatch.h \
+    sphobstacle.h
 SOURCES       = glwidget.cpp \
                 main.cpp \
                 window.cpp \
@@ -28,6 +29,8 @@ SOURCES       = glwidget.cpp \
 QT           += opengl widgets
 
 QMAKE_CXXFLAGS += -std=c++0x
+
+LIBS += -LC:\Users\Ryan\Documents\csc473\project\src\SOIL\lib -lSOIL
 
 contains(QT_CONFIG, opengles.) {
     contains(QT_CONFIG, angle): \

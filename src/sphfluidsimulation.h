@@ -31,16 +31,9 @@ public:
     void setDampingConstant(double c);
 
 private:
-    inline double evaluatePoly6Kernel(double rSquared);
-    inline glm::vec3 evaluateSpikeyGradKernel(double r, glm::vec3 pi, glm::vec3 pj);
-    inline glm::vec3 evaluateGradKernel(double r, glm::vec3 pi, glm::vec3 pj);
-    inline double evaluateKernel(double r);
-    inline double evaluatePressureState(SPHParticle *sp);
-    inline double evaluateObstaclePressureState(SPHParticle *sp);
+
     inline double evaluateSpeedOfSound(SPHParticle *sp);
     inline double evaluateSpeedOfSoundSquared(SPHParticle *sp);
-    double calculateViscosityTerm(SPHParticle *pi, SPHParticle *pj);
-    void initSmoothingRadius(double h);
     SPHParticle* createSPHParticle(glm::vec3 pos, glm::vec3 velocity);
     SPHParticle* createSPHObstacleParticle(glm::vec3 pos);
 
@@ -48,51 +41,26 @@ private:
     int getUniqueObstacleID();
     int currentObstacleID = 0;
 
-    void updatePressure();
-    void updateSpeedOfSound();
     void updateGrid();
     void updateNearestNeighbours();
-    void updateFluidAccelerationAndDensityRateOfChange();
     void updateBoundaryForces();
-    void updateObstacleDensityRateOfChange();
-    void updateFluidDensity();
-    void updateXSPHVelocity();
     void updateFluidPositionAndDensity(double dt);
     void enforceFluidParticlePositionBounds(SPHParticle *p);
-    void updateObstacleVelocityAndDensity(double dt);
     double calculateTimeStep();
 
     double h;                              // smoothing radius
     double hsq;                            // radius squared
-    double poly6Coefficient;
-    double spikeyGradCoefficient;
-    double particleMass = 0.3;
-    double initialDensity = 1000.0;        // kg/m^3
-    double ratioOfSpecificHeats = 1.0;
     glm::vec3 gravityForce;
     double gravityMagnitude = 2.0;
-    double pressureStateCoefficient = 100000;       // kg/m^2
-
+    double initialDensity = 1000.0;
+    double particleMass = 1.0;
+    double motionDampingCoefficient = 1.0;
+    double ratioOfSpecificHeats = 1.0;
     double courantSafetyFactor = 1.0;
     double minTimeStep = 1.0/240.0;
 
-    bool isDensityRateOfChangeEnabled = true;
-    bool isDensityInitializationStaggered = true;
-
-    bool isXSPHEnabled = false;
-    double XSPHCoefficient = 0.25;
-
-    bool isViscosityEnabled = false;
-    double viscosityAlpha = 1;
-    double viscosityBeta = 2;
-
-    bool isMotionDampingEnabled = true;
-    double motionDampingCoefficient = 8.0;
-
-    double maximumAcceleration = 250.0;
+    // constraints
     double maximumVelocity = 100.0;
-    double maximumDensityVelocity = 100.0;
-    double minimumDensity = 0.1;
 
     // boundary
     double boundaryForceRadius = 0.1;

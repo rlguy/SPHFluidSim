@@ -9,7 +9,33 @@ SPHFluidSimulation::SPHFluidSimulation(double smoothingRadius)
 {
     h = smoothingRadius;
     grid = SpatialGrid(h);
+
+    initSimulationConstants();
+    initKernelConstants();
+}
+
+void SPHFluidSimulation::initSimulationConstants() {
+    hsq = h*h;
+    ratioOfSpecificHeats = 1.0;
+    pressureCoefficient = 20.0;
+    initialDensity = 20.0;
+    viscosityCoefficient = 0.065;
+    particleMass = 1.0;
+    maximumVelocity = 100.0;
+    maximumAcceleration = 100.0;
+    motionDampingCoefficient = 0.0;
+    boundaryDampingCoefficient = 0.2;
+    gravityMagnitude = 9.9;
     gravityForce = glm::vec3(0.0, -gravityMagnitude, 0.0);
+    isMotionDampingEnabled = true;
+}
+
+void SPHFluidSimulation::initKernelConstants() {
+    double pi = 3.1415926535897;
+
+    poly6Coefficient = 315.0/(64.0*pi*powf(h, 9.0));
+    spikeyGradCoefficient = -45.0/(pi*powf(h, 6.0));
+    viscosityLaplacianCoefficient = 45.0/(pi*powf(h, 6.0f));
 }
 
 void SPHFluidSimulation::setBounds(double _xmin, double _xmax,
@@ -22,6 +48,14 @@ void SPHFluidSimulation::setBounds(double _xmin, double _xmax,
 
 void SPHFluidSimulation::setDampingConstant(double c) {
     motionDampingCoefficient = c;
+}
+
+std::vector<SPHParticle*> SPHFluidSimulation::getFluidParticles() {
+    return fluidParticles;
+}
+
+float SPHFluidSimulation::getParticleSize() {
+    return h;
 }
 
 void SPHFluidSimulation::addFluidParticles(std::vector<glm::vec3> points) {
@@ -177,34 +211,118 @@ void SPHFluidSimulation::updateNearestNeighbours() {
     }
 }
 
+void SPHFluidSimulation::updateFluidDensityAndPressure() {
+    // once we find a particle's density, we can find it's pressure
+    SPHParticle *pi, *pj;
+    glm::vec3 r;
+    for (uint i=0; i<fluidParticles.size(); i++) {
+        pi = fluidParticles[i];
+        double density = 0.0;
+
+        for (uint j=0; j<pi->neighbours.size(); j++) {
+            pj = pi->neighbours[j];
+            r = pi->position - pj->position;
+            double distsq = glm::dot(r, r);
+            double diff = hsq - distsq;
+            density += pj->mass*poly6Coefficient*diff*diff*diff;
+        }
+
+        pi->density = fmax(density, initialDensity);  // less than initial density
+                                                      // produces negative pressures
+        pi->pressure = pressureCoefficient*(pi->density - initialDensity);
+
+
+    }
+}
+
+void SPHFluidSimulation::updateFluidAcceleration() {
+    // we know particle density and pressure, so acceleration can be found
+    SPHParticle *pi, *pj;
+    glm::vec3 acc;
+    glm::vec3 r;
+    glm::vec3 vdiff;
+    for (uint i=0; i<fluidParticles.size(); i++) {
+        pi = fluidParticles[i];
+        acc = glm::vec3(0.0, 0.0, 0.0);
+
+        for (uint j=0; j<pi->neighbours.size(); j++) {
+            pj = pi->neighbours[j];
+            r = pi->position - pj->position;
+            double dist = glm::length(r);
+
+            if (dist == 0.0) { continue; }
+            float inv = 1/dist;
+            r = inv*r;
+
+            // acceleration due to pressure
+            float diff = h - dist;
+            float spikey = spikeyGradCoefficient*diff*diff;
+            float massRatio = pj->mass/pi->mass;
+            float pterm = (pi->pressure + pj->pressure) / (2*pi->density*pj->density);
+            acc -= (float)(massRatio*pterm*spikey)*r;
+
+            // acceleration due to viscosity
+            float lap = viscosityLaplacianCoefficient*diff;
+            vdiff = pj->velocity - pi->velocity;
+            acc += (float)(viscosityCoefficient*massRatio*(1/pj->density)*lap)*vdiff;
+        }
+
+        // acceleration due to gravity
+        acc += gravityForce;
+
+        // acceleration due to simulation bounds
+        acc += calculateBoundaryAcceleration(pi);
+
+        // motion damping;
+        double mag = glm::length(acc);
+        if (isMotionDampingEnabled) {
+            glm::vec3 damp = pi->velocity * (float) motionDampingCoefficient;
+            if (glm::length(damp) > mag) {
+                acc = glm::vec3(0.0, 0.0, 0.0);
+            } else {
+                acc -= damp;
+            }
+        }
+
+
+        if (mag > maximumAcceleration) {
+            acc = (acc / (float)mag) * (float)maximumAcceleration;
+        }
+
+        pi->acceleration = acc;
+
+    }
+}
 
 void SPHFluidSimulation::enforceFluidParticlePositionBounds(SPHParticle *p) {
+
+    float d = boundaryDampingCoefficient;
     if (p->position.x < xmin) {
         p->position = glm::vec3(xmin, p->position.y, p->position.z);
-        p->velocity = glm::vec3(-p->velocity.x, p->velocity.y, p->velocity.z);
+        p->velocity = glm::vec3(-d*p->velocity.x, p->velocity.y, p->velocity.z);
     } else if (p->position.x > xmax) {
         p->position = glm::vec3(xmax, p->position.y, p->position.z);
-        p->velocity = glm::vec3(-p->velocity.x, p->velocity.y, p->velocity.z);
+        p->velocity = glm::vec3(-d*p->velocity.x, p->velocity.y, p->velocity.z);
     }
 
     if (p->position.y < ymin) {
         p->position = glm::vec3(p->position.x, ymin, p->position.z);
-        p->velocity = glm::vec3(p->velocity.x, -p->velocity.y, p->velocity.z);
+        p->velocity = glm::vec3(p->velocity.x, -d*p->velocity.y, p->velocity.z);
     } else if (p->position.y > ymax) {
         p->position = glm::vec3(p->position.x, ymax, p->position.z);
-        p->velocity = glm::vec3(p->velocity.x, -p->velocity.y, p->velocity.z);
+        p->velocity = glm::vec3(p->velocity.x, -d*p->velocity.y, p->velocity.z);
     }
 
     if (p->position.z < zmin) {
         p->position = glm::vec3(p->position.x, p->position.y, zmin);
-        p->velocity = glm::vec3(p->velocity.x, p->velocity.y, -p->velocity.z);
+        p->velocity = glm::vec3(p->velocity.x, p->velocity.y, -d*p->velocity.z);
     } else if (p->position.z > zmax) {
         p->position = glm::vec3(p->position.x, p->position.y, zmax);
-        p->velocity = glm::vec3(p->velocity.x, p->velocity.y, -p->velocity.z);
+        p->velocity = glm::vec3(p->velocity.x, p->velocity.y, -d*p->velocity.z);
     }
 }
 
-void SPHFluidSimulation::updateFluidPositionAndDensity(double dt) {
+void SPHFluidSimulation::updateFluidPosition(double dt) {
     SPHParticle *p;
     for (uint i=0; i<fluidParticles.size(); i++) {
         p = fluidParticles[i];
@@ -217,9 +335,8 @@ void SPHFluidSimulation::updateFluidPositionAndDensity(double dt) {
             p->isHalfTimeStepVelocityInitialized = true;
         }
 
-        // new position calculated with half time step velocity plus xsph variant
-        glm::vec3 velocity;
-        p->position += (float)dt * velocity;
+        // new position calculated with half time step for leap frog integration
+        p->position += (float)dt * p->velocityAtHalfTimeStep;
 
         // update sph velocity by advancing half time step velocty by 1/2 interval
         p->velocity = p->velocityAtHalfTimeStep + (float)(0.5*dt) * p->acceleration;
@@ -229,57 +346,49 @@ void SPHFluidSimulation::updateFluidPositionAndDensity(double dt) {
         }
 
         enforceFluidParticlePositionBounds(p);
-
     }
 
 }
 
-void SPHFluidSimulation::updateBoundaryForces() {
-    SPHParticle *sp;
+glm::vec3 SPHFluidSimulation::calculateBoundaryAcceleration(SPHParticle *sp) {
     double r = boundaryForceRadius;
     double minf = minBoundaryForce;
     double maxf = maxBoundaryForce;
 
-    for (uint i=0; i<fluidParticles.size(); i++) {
-        sp = fluidParticles[i];
-        glm::vec3 p = sp->position;
+    glm::vec3 p = sp->position;
+    glm::vec3 acceleration = glm::vec3(0.0, 0.0, 0.0);
 
-        if (p.x < xmin + r) {
-            double dist = fmax(0.0, p.x - xmin);
-            double force = utils::lerp(maxf, minf, dist/r);
-            sp->acceleration += glm::vec3(force/sp->mass, 0.0, 0.0);
-        }
-
-        if (p.x > xmax - r) {
-            double dist = fmax(0.0, xmax - p.x);
-            double force = utils::lerp(maxf, minf, dist/r);
-            sp->acceleration += glm::vec3(-force/sp->mass, 0.0, 0.0);
-        }
-
-        if (p.y < ymin + r) {
-            double dist = fmax(0.0, p.y - ymin);
-            double force = utils::lerp(maxf, minf, dist/r);
-            sp->acceleration += glm::vec3(0.0, force/sp->mass, 0.0);
-        }
-
-        if (p.y > ymax - r) {
-            double dist = fmax(0.0, ymax - p.y);
-            double force = utils::lerp(maxf, minf, dist/r);
-            sp->acceleration += glm::vec3(0.0, -force/sp->mass, 0.0);
-        }
-
-        if (p.z < zmin + r) {
-            double dist = fmax(0.0, p.z - zmin);
-            double force = utils::lerp(maxf, minf, dist/r);
-            sp->acceleration += glm::vec3(0.0, 0.0, force/sp->mass);
-        }
-
-        if (p.z > zmax - r) {
-            double dist = fmax(0.0, zmax - p.z);
-            double force = utils::lerp(maxf, minf, dist/r);
-            sp->acceleration += glm::vec3(0.0, 0.0, -force/sp->mass);
-        }
+    if (p.x < xmin + r) {
+        double dist = fmax(0.0, p.x - xmin);
+        double force = utils::lerp(maxf, minf, dist/r);
+        acceleration += glm::vec3(force/sp->mass, 0.0, 0.0);
+    } else if (p.x > xmax - r) {
+        double dist = fmax(0.0, xmax - p.x);
+        double force = utils::lerp(maxf, minf, dist/r);
+        acceleration += glm::vec3(-force/sp->mass, 0.0, 0.0);
     }
+
+    if (p.y < ymin + r) {
+        double dist = fmax(0.0, p.y - ymin);
+        double force = utils::lerp(maxf, minf, dist/r);
+        acceleration += glm::vec3(0.0, force/sp->mass, 0.0);
+    } else if (p.y > ymax - r) {
+        double dist = fmax(0.0, ymax - p.y);
+        double force = utils::lerp(maxf, minf, dist/r);
+        acceleration += glm::vec3(0.0, -force/sp->mass, 0.0);
+    }
+
+    if (p.z < zmin + r) {
+        double dist = fmax(0.0, p.z - zmin);
+        double force = utils::lerp(maxf, minf, dist/r);
+        acceleration += glm::vec3(0.0, 0.0, force/sp->mass);
+    } else if (p.z > zmax - r) {
+        double dist = fmax(0.0, zmax - p.z);
+        double force = utils::lerp(maxf, minf, dist/r);
+        acceleration += glm::vec3(0.0, 0.0, -force/sp->mass);
+    }
+
+    return acceleration;
 }
 
 void SPHFluidSimulation::update(float dt) {
@@ -297,9 +406,8 @@ void SPHFluidSimulation::update(float dt) {
         updateNearestNeighbours();
         t2.stop();
 
-        updateBoundaryForces();
-
-
+        updateFluidDensityAndPressure();
+        updateFluidAcceleration();
 
         // calculate next time step
         double timeStep = calculateTimeStep();
@@ -308,10 +416,9 @@ void SPHFluidSimulation::update(float dt) {
             timeStep = timeStep + timeLeft;
             timeLeft = 0.0;
         }
-
         numSteps += 1;
 
-        updateFluidPositionAndDensity((double)timeStep);
+        updateFluidPosition((double)timeStep);
     }
     //qDebug() << numSteps;
     t1.stop();
@@ -324,6 +431,7 @@ void SPHFluidSimulation::update(float dt) {
 void SPHFluidSimulation::draw() {
     //grid.draw();
 
+    /*
     glColor3f(0.0, 0.3, 1.0);
     glPointSize(5.0);
     glBegin(GL_POINTS);
@@ -331,6 +439,7 @@ void SPHFluidSimulation::draw() {
         glm::vec3 p = fluidParticles[i]->position;
         glVertex3f(p.x, p.y, p.z);
     }
+    */
 
     //glColor4f(0.0, 0.0, 0.0, 0.1);
     for (uint i=0; i<obstacleParticles.size(); i++) {

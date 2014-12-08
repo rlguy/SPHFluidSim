@@ -29,9 +29,13 @@ public:
                    double ymin, double ymax,
                    double zmin, double zmax);
     void setDampingConstant(double c);
+    std::vector<SPHParticle*> getFluidParticles();
+    float getParticleSize();
 
 private:
 
+    void initSimulationConstants();
+    void initKernelConstants();
     inline double evaluateSpeedOfSound(SPHParticle *sp);
     inline double evaluateSpeedOfSoundSquared(SPHParticle *sp);
     SPHParticle* createSPHParticle(glm::vec3 pos, glm::vec3 velocity);
@@ -43,29 +47,40 @@ private:
 
     void updateGrid();
     void updateNearestNeighbours();
-    void updateBoundaryForces();
-    void updateFluidPositionAndDensity(double dt);
+    void updateFluidDensityAndPressure();
+    glm::vec3 calculateBoundaryAcceleration(SPHParticle *sp);
+    void updateFluidAcceleration();
+    void updateFluidPosition(double dt);
     void enforceFluidParticlePositionBounds(SPHParticle *p);
     double calculateTimeStep();
 
+    // simulation constants
     double h;                              // smoothing radius
     double hsq;                            // radius squared
     glm::vec3 gravityForce;
-    double gravityMagnitude = 2.0;
-    double initialDensity = 1000.0;
-    double particleMass = 1.0;
-    double motionDampingCoefficient = 1.0;
-    double ratioOfSpecificHeats = 1.0;
     double courantSafetyFactor = 1.0;
     double minTimeStep = 1.0/240.0;
+    double gravityMagnitude;
+    double initialDensity;
+    double pressureCoefficient;
+    double particleMass;
+    bool isMotionDampingEnabled = false;
+    double motionDampingCoefficient;
+    double boundaryDampingCoefficient;
+    double ratioOfSpecificHeats;
+    double viscosityCoefficient;
+    double maximumVelocity;
+    double maximumAcceleration;
 
-    // constraints
-    double maximumVelocity = 100.0;
+    // kernel constants
+    double poly6Coefficient;
+    double spikeyGradCoefficient;
+    double viscosityLaplacianCoefficient;
 
-    // boundary
+    // boundary constraints
     double boundaryForceRadius = 0.1;
     double minBoundaryForce = 0.0;
-    double maxBoundaryForce = 0.8;
+    double maxBoundaryForce = 2.0;
     double xmin = 0.0;
     double xmax = 1.0;
     double ymin = 0.0;

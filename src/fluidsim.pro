@@ -30,7 +30,8 @@ QT           += opengl widgets
 
 QMAKE_CXXFLAGS += -std=c++0x
 
-LIBS += -LC:\Users\Ryan\Documents\csc473\project\src\SOIL\lib -lSOIL
+#INCLUDEPATH += C:\Users\Ryan\Documents\csc473\project\src\SOIL\src
+#LIBS += -LC:\Users\Ryan\Documents\csc473\project\src\SOIL\lib -lSOIL
 
 contains(QT_CONFIG, opengles.) {
     contains(QT_CONFIG, angle): \

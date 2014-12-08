@@ -110,6 +110,7 @@ private:
     void updateCameraMovement(float dt);
     void drawGrid();
     void drawAnimation();
+    void drawBillboard(GLuint *tex, glm::vec3 p, float width);
     void initializeSimulation();
     void stopSimulation();
     void writeFrame();
@@ -142,6 +143,9 @@ private:
     float deltaTimeModifier;
     float runningTime;
     int currentFrame;
+
+    // billboard test
+    GLuint texture[1];
 
     SPHFluidSimulation fluidSim;
 };

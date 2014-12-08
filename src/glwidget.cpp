@@ -83,8 +83,8 @@ GLWidget::GLWidget(QWidget *parent)
     deltaTimer->start();
 
     // Initialize camera
-    glm::vec3 pos = glm::vec3(12, 10.0, 12);
-    glm::vec3 dir = glm::normalize(glm::vec3(-pos.x, -pos.y, -pos.z));
+    glm::vec3 pos = glm::vec3(25, 10.0, 3.0);
+    glm::vec3 dir = glm::normalize(glm::vec3(-pos.x, -pos.y, -0.0));
     camera = camera3d(pos, dir, screenWidth, screenHeight,
                       60.0, 0.5, 100.0);
 
@@ -110,13 +110,34 @@ GLWidget::GLWidget(QWidget *parent)
     currentFrame = 0;
 
 
-    double radius = 0.1;
+    double radius = 0.2;
     fluidSim = SPHFluidSimulation(radius);
 
     std::vector<glm::vec3> points;
-    int nx = 20;
-    int ny = 20;
-    int nz = 10;
+
+    double minx = 0.0;
+    double maxx = 3.0;
+    double miny = 0.0;
+    double maxy = 8.0;
+    double minz = 0.0;
+    double maxz = 3.0;
+    double rx = 1.0;
+    double ry = 0.5;
+    double rz = 1.0;
+
+    fluidSim.setBounds(minx, maxx, miny, maxy, minz, maxz);
+    double n = 10000;
+    for (int i=0; i<n; i++) {
+        float x = minx + rx*((float)rand()/RAND_MAX) * (maxx - minx);
+        float y = miny + ry*((float)rand()/RAND_MAX) * (maxy - miny);
+        float z = minz + rz*((float)rand()/RAND_MAX) * (maxz - minz);
+        glm::vec3 p = glm::vec3(x, y, z);
+        points.push_back(p);
+    }
+    fluidSim.addFluidParticles(points);
+    fluidSim.setDampingConstant(8.0);
+
+    /*
     float pad = 1.05*radius;
     float stagger = 0.1*radius;
     glm::vec3 r = glm::vec3(0.1, 0.1, 0.1);
@@ -133,9 +154,9 @@ GLWidget::GLWidget(QWidget *parent)
             }
         }
     }
-    fluidSim.addFluidParticles(points);
 
-    fluidSim.setBounds(0.0, 2.0, 0.0, 8.0, 0.0, 1.0);
+    */
+
 
     /*
     nx = 100;
@@ -184,6 +205,29 @@ GLWidget::GLWidget(QWidget *parent)
     int id = fluidSim.addObstacleParticles(obstaclePoints);
     */
 
+    /*
+    QImage img;
+    if( !img.load("images/ball.bmp") ) {
+        qDebug() << "error loading image";
+        exit(1);
+    }
+
+    QImage GL_formatted_image;
+    GL_formatted_image = QGLWidget::convertToGLFormat(img);
+    if( GL_formatted_image.isNull() ) {
+        qDebug() << "error formatting";
+    }
+
+    glGenTextures(1, texture);
+    glBindTexture(GL_TEXTURE_2D, texture[0]);
+    glTexImage2D( GL_TEXTURE_2D, 0, GL_RGBA,
+            GL_formatted_image.width(), GL_formatted_image.height(),
+            0, GL_RGBA, GL_UNSIGNED_BYTE, GL_formatted_image.bits() );
+    glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_LINEAR);
+    */
+
+
 
 }
 
@@ -203,6 +247,14 @@ QSize GLWidget::sizeHint() const
 
 void GLWidget::initializeGL()
 {
+
+    QPixmap piximg = QPixmap("images/blankball.png");
+    if (piximg.isNull()) {
+        qDebug() << "pixmap is null";
+        exit(1);
+    }
+    texture[0] = bindTexture(piximg, GL_TEXTURE_2D);
+
     static const GLfloat lightPos[4] = { 20.0f, 20.0f, 20.0f, 1.0f };
     glLightfv(GL_LIGHT0, GL_POSITION, lightPos);
     glEnable(GL_LIGHTING);
@@ -213,6 +265,7 @@ void GLWidget::initializeGL()
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
+
 }
 
 
@@ -308,6 +361,34 @@ bool GLWidget::saveFrameToFile(QString fileName) {
     return r;
 }
 
+void GLWidget::drawBillboard(GLuint *tex, glm::vec3 p, float width) {
+    float hw = 0.5*width;
+    glm::vec3 look = glm::normalize(camera.position - p);
+    glm::vec3 right = glm::normalize(glm::cross(camera.up, look));
+    glm::vec3 up = glm::cross(look, right);
+
+    glm::mat4 mat = glm::transpose(glm::mat4(right.x, up.x, look.x, p.x,
+                                             right.y, up.y, look.y, p.y,
+                                             right.z, up.z, look.z, p.z,
+                                             0.0, 0.0, 0.0, 1.0));
+    glPushMatrix();
+    glMultMatrixf((GLfloat*)&mat);
+
+    glEnable(GL_TEXTURE_2D);
+    glDisable(GL_LIGHTING);
+    glBindTexture(GL_TEXTURE_2D, tex[0]);
+    glBegin(GL_QUADS);
+    glTexCoord2f(0.0f, 0.0f); glVertex3f(-hw, -hw,  0.0f);
+    glTexCoord2f(1.0f, 0.0f); glVertex3f( hw, -hw,  0.0f);
+    glTexCoord2f(1.0f, 1.0f); glVertex3f( hw,  hw,  0.0f);
+    glTexCoord2f(0.0f, 1.0f); glVertex3f(-hw,  hw,  0.0f);
+    glEnd();
+    glEnable(GL_LIGHTING);
+    glDisable(GL_TEXTURE_2D);
+
+    glPopMatrix();
+}
+
 void GLWidget::paintGL()
 {
     camera.set();
@@ -321,7 +402,18 @@ void GLWidget::paintGL()
     glPushMatrix();
     glMultMatrixf((GLfloat*)&scaleMat);
     fluidSim.draw();
+
+    glColor3f(1.0, 0.4, 0.0);
+    std::vector<SPHParticle*> particles = fluidSim.getFluidParticles();
+    float size = 0.5*fluidSim.getParticleSize();
+    for (uint i=0; i<particles.size(); i++) {
+        glm::vec3 p = particles[i]->position;
+        drawBillboard(&texture[0], p, size);
+    }
+
     glPopMatrix();
+
+
 
     camera.unset();
 }
@@ -378,9 +470,9 @@ void GLWidget::keyReleaseEvent(QKeyEvent *event)
         deltaTimeModifier = maxDeltaTimeModifier;
     }
 
-    if (event->key() == Qt::Key_G) {
-        fluidSim.setDampingConstant(0.5);
-        fluidSim.setBounds(0.0, 2.0, 0.0, 8.0, 0.0, 6.0);
+    if (event->key() == Qt::Key_H) {
+        fluidSim.setDampingConstant(0);
+        fluidSim.setBounds(0.0, 8.0, 0.0, 8.0, 0.0, 8.0);
         isRendering = true;
     }
 

@@ -126,7 +126,7 @@ GLWidget::GLWidget(QWidget *parent)
     double rz = 1.0;
 
     fluidSim.setBounds(minx, maxx, miny, maxy, minz, maxz);
-    double n = 10000;
+    double n = 100;
     for (int i=0; i<n; i++) {
         float x = minx + rx*((float)rand()/RAND_MAX) * (maxx - minx);
         float y = miny + ry*((float)rand()/RAND_MAX) * (maxy - miny);

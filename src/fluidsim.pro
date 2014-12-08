@@ -30,11 +30,13 @@ QT           += opengl widgets
 
 QMAKE_CXXFLAGS += -std=c++0x
 
-#INCLUDEPATH += C:\Users\Ryan\Documents\csc473\project\src\SOIL\src
-#LIBS += -LC:\Users\Ryan\Documents\csc473\project\src\SOIL\lib -lSOIL
 
 contains(QT_CONFIG, opengles.) {
     contains(QT_CONFIG, angle): \
         warning("Qt was built with ANGLE, which provides only OpenGL ES 2.0 on top of DirectX 9.0c")
     error("This example requires Qt to be configured with -opengl desktop")
 }
+
+LIBS += "C:/MinGW/lib/liblua51.a"
+
+OTHER_FILES +=

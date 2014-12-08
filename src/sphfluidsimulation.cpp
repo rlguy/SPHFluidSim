@@ -1,5 +1,6 @@
 #include "sphfluidsimulation.h"
 
+
 SPHFluidSimulation::SPHFluidSimulation()
 {
     h = 1.0;
@@ -15,19 +16,31 @@ SPHFluidSimulation::SPHFluidSimulation(double smoothingRadius)
 }
 
 void SPHFluidSimulation::initSimulationConstants() {
+    using namespace luabridge;
+
+    lua_State* L = luaL_newstate();
+    luaL_openlibs(L);
+
+    if (luaL_dofile(L, "scripts/fluid_config.lua") != 0) {
+        qDebug() << "Error loading script";
+        exit(1);
+    }
+    LuaRef t = getGlobal(L, "settings");
+
     hsq = h*h;
-    ratioOfSpecificHeats = 1.0;
-    pressureCoefficient = 20.0;
-    initialDensity = 20.0;
-    viscosityCoefficient = 0.065;
-    particleMass = 1.0;
-    maximumVelocity = 100.0;
-    maximumAcceleration = 100.0;
-    motionDampingCoefficient = 0.0;
-    boundaryDampingCoefficient = 0.2;
-    gravityMagnitude = 9.9;
+    ratioOfSpecificHeats        = t["ratioOfSpecificHeats"].cast<double>();
+    pressureCoefficient         = t["pressureCoefficient"].cast<double>();
+    initialDensity              = t["initialDensity"].cast<double>();
+    viscosityCoefficient        = t["viscosityCoefficient"].cast<double>();
+    particleMass                = t["particleMass"].cast<double>();
+    maximumVelocity             = t["maximumVelocity"].cast<double>();
+    maximumAcceleration         = t["maximumAcceleration"].cast<double>();
+    motionDampingCoefficient    = t["motionDampingCoefficient"].cast<double>();
+    boundaryDampingCoefficient  = t["boundaryDampingCoefficient"].cast<double>();
+    gravityMagnitude            = t["gravityMagnitude"].cast<double>();
+    isMotionDampingEnabled      = t["isMotionDampingEnabled"].cast<bool>();
+
     gravityForce = glm::vec3(0.0, -gravityMagnitude, 0.0);
-    isMotionDampingEnabled = true;
 }
 
 void SPHFluidSimulation::initKernelConstants() {
@@ -424,7 +437,7 @@ void SPHFluidSimulation::update(float dt) {
     t1.stop();
 
     //qDebug() << "update:" << t1.getTime() << "neighbours:" << t2.getTime() <<
-    //            "pct:" << (t2.getTime()/t1.getTime())*100.0;
+    //           "pct:" << (t2.getTime()/t1.getTime())*100.0;
 
 }
 

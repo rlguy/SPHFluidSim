@@ -12,12 +12,13 @@ settings = {
   boundaryDampingCoefficient     = 0.2,
   gravityMagnitude               = 9.8,
   isMotionDampingEnabled         = true,
+  isBoundaryParticlesEnabled     = false,
   displaySimulationConsoleOutput = true,
 
   -- config for setting up simulation
   fps                            = 30,
   smoothingRadius                = 0.2,
-  numParticles                   = 6000,
+  numParticles                   = 16000,
   initialDampingConstant         = 8.0,
   finalDampingConstant           = 0.0,
   minColorDensity                = 0.0,
@@ -26,18 +27,18 @@ settings = {
   isSimulationPaused             = false,
   
   initialBounds                  = {minx = 0.0,
-                                    maxx = 4.0,
+                                    maxx = 3.0,
                                     miny = 0.0,
-                                    maxy = 4.0,
+                                    maxy = 8.0,
                                     minz = 0.0,
-                                    maxz = 4.0},
+                                    maxz = 2.0},
                                     
   finalBounds                    = {minx = 0.0,
-                                    maxx = 4.0,
+                                    maxx = 8.0,
                                     miny = 0.0,
-                                    maxy = 4.0,
+                                    maxy = 8.0,
                                     minz = 0.0,
-                                    maxz = 4.0}
+                                    maxz = 2.0}
     
 }
 

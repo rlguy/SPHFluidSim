@@ -13,6 +13,7 @@ SPHFluidSimulation::SPHFluidSimulation(double smoothingRadius)
 
     initSimulationConstants();
     initKernelConstants();
+    initializeBoundaryParticles();
 }
 
 void SPHFluidSimulation::initSimulationConstants() {
@@ -39,6 +40,7 @@ void SPHFluidSimulation::initSimulationConstants() {
     boundaryDampingCoefficient     = t["boundaryDampingCoefficient"].cast<double>();
     gravityMagnitude               = t["gravityMagnitude"].cast<double>();
     isMotionDampingEnabled         = t["isMotionDampingEnabled"].cast<bool>();
+    isBoundaryParticlesEnabled     = t["isBoundaryParticlesEnabled"].cast<bool>();
     displaySimulationConsoleOutput = t["displaySimulationConsoleOutput"].cast<bool>();
 
     gravityForce = glm::vec3(0.0, -gravityMagnitude, 0.0);
@@ -62,8 +64,9 @@ void SPHFluidSimulation::setBounds(double _xmin, double _xmax,
     xmin = _xmin; xmax = _xmax;
     ymin = _ymin; ymax = _ymax;
     zmin = _zmin; zmax = _zmax;
+    initializeBoundaryParticles();
 
-    isEnforcingFluidParticlePositionBoundsThisTimeStep = true;
+    isEnforcingFluidParticlePositionBoundsThisTimeStep = false;
 }
 
 void SPHFluidSimulation::setDampingConstant(double c) {
@@ -187,6 +190,75 @@ int SPHFluidSimulation::getUniqueObstacleID() {
     int id = currentObstacleID;
     currentObstacleID++;
     return id;
+}
+
+void SPHFluidSimulation::initializeBoundaryParticles() {
+    if (!isBoundaryParticlesEnabled) {
+        return;
+    }
+
+    if (isBoundaryObstacleInitialized) {
+        removeObstacle(boundaryObstacleID);
+    }
+
+    std::vector<glm::vec3> obsPoints;
+    glm::vec3 xdir = glm::vec3(1.0, 0.0, 0.0);
+    glm::vec3 ydir = glm::vec3(0.0, 1.0, 0.0);
+    glm::vec3 zdir = glm::vec3(0.0, 0.0, 1.0);
+    float xwidth = xmax - xmin;
+    float ywidth = ymax - ymin;
+    float zwidth = zmax - zmin;
+    float pad = h;
+    int layers = 1;
+    bool isStaggered = true;
+
+    // x-z (ymin) plane
+    glm::vec3 o = glm::vec3(xmin + 0.5*xwidth, 0.0, zmin + 0.5*zwidth);
+    std::vector<glm::vec3> points = utils::createPointPanel(xwidth, zwidth, pad,
+                                                            layers, xdir, zdir, isStaggered);
+    points = utils::translatePoints(points, o);
+    obsPoints = utils::mergePoints(obsPoints, points);
+
+    // x-z (y-max) plane
+    o = glm::vec3(xmin + 0.5*xwidth, ymin + ywidth, zmin + 0.5*zwidth);
+    points = utils::createPointPanel(xwidth, zwidth, pad, layers, xdir, zdir, isStaggered);
+    points = utils::translatePoints(points, o);
+    obsPoints = utils::mergePoints(obsPoints, points);
+
+    // x-y (z-min) plane
+    o = glm::vec3(xmin + 0.5*xwidth, ymin + 0.5*xwidth, 0.0);
+    points = utils::createPointPanel(xwidth, ywidth, pad, layers, xdir, ydir, isStaggered);
+    points = utils::translatePoints(points, o);
+    obsPoints = utils::mergePoints(obsPoints, points);
+
+    // x-y (z-max) plane
+    o = glm::vec3(xmin + 0.5*xwidth, ymin + 0.5*xwidth, zmin + zwidth);
+    points = utils::createPointPanel(xwidth, ywidth, pad, layers, xdir, ydir, isStaggered);
+    points = utils::translatePoints(points, o);
+    obsPoints = utils::mergePoints(obsPoints, points);
+
+    // y-z (x-min) plane
+    o = glm::vec3(0.0 ,ymin + 0.5*xwidth, zmin + 0.5*zwidth);
+    points = utils::createPointPanel(ywidth, zwidth, pad, layers, ydir, zdir, isStaggered);
+    points = utils::translatePoints(points, o);
+    obsPoints = utils::mergePoints(obsPoints, points);
+
+    // y-z (x-max) plane
+    o = glm::vec3(xmin + xwidth, ymin + 0.5*xwidth, zmin + 0.5*zwidth);
+    points = utils::createPointPanel(ywidth, zwidth, pad, layers, ydir, zdir, isStaggered);
+    points = utils::translatePoints(points, o);
+    obsPoints = utils::mergePoints(obsPoints, points);
+
+    boundaryObstacleID = addObstacleParticles(obsPoints);
+
+    SPHObstacle *obs = obstaclesByID[boundaryObstacleID];
+    obs->isVisible = false;
+
+    for (uint i=0; i<obs->particles.size(); i++) {
+        obs->particles[i]->isVisible = false;
+    }
+
+    isBoundaryObstacleInitialized = true;
 }
 
 SPHParticle* SPHFluidSimulation::createSPHParticle(glm::vec3 pos, glm::vec3 velocity) {
@@ -423,9 +495,11 @@ void SPHFluidSimulation::updateFluidAcceleration() {
             acc -= (float)(massRatio*pterm*spikey)*r;
 
             // acceleration due to viscosity
-            float lap = viscosityLaplacianCoefficient*diff;
-            vdiff = pj->velocity - pi->velocity;
-            acc += (float)(viscosityCoefficient*massRatio*(1/pj->density)*lap)*vdiff;
+            if (!pj->isObstacle) {
+                float lap = viscosityLaplacianCoefficient*diff;
+                vdiff = pj->velocity - pi->velocity;
+                acc += (float)(viscosityCoefficient*massRatio*(1/pj->density)*lap)*vdiff;
+            }
         }
 
         // acceleration due to gravity
@@ -457,33 +531,36 @@ void SPHFluidSimulation::updateFluidAcceleration() {
 
 void SPHFluidSimulation::enforceFluidParticlePositionBounds(SPHParticle *p) {
     if (!isEnforcingFluidParticlePositionBoundsThisTimeStep) {
+        isEnforcingFluidParticlePositionBoundsThisTimeStep = true;
         return;
     }
 
+    double eps = 0.001;
     float d = boundaryDampingCoefficient;
     if (p->position.x < xmin) {
-        p->position = glm::vec3(xmin, p->position.y, p->position.z);
+        p->position = glm::vec3(xmin + eps, p->position.y, p->position.z);
         p->velocity = glm::vec3(-d*p->velocity.x, p->velocity.y, p->velocity.z);
     } else if (p->position.x > xmax) {
-        p->position = glm::vec3(xmax, p->position.y, p->position.z);
+        p->position = glm::vec3(xmax - eps, p->position.y, p->position.z);
         p->velocity = glm::vec3(-d*p->velocity.x, p->velocity.y, p->velocity.z);
     }
 
     if (p->position.y < ymin) {
-        p->position = glm::vec3(p->position.x, ymin, p->position.z);
+        p->position = glm::vec3(p->position.x, ymin + eps, p->position.z);
         p->velocity = glm::vec3(p->velocity.x, -d*p->velocity.y, p->velocity.z);
     } else if (p->position.y > ymax) {
-        p->position = glm::vec3(p->position.x, ymax, p->position.z);
+        p->position = glm::vec3(p->position.x, ymax - eps, p->position.z);
         p->velocity = glm::vec3(p->velocity.x, -d*p->velocity.y, p->velocity.z);
     }
 
     if (p->position.z < zmin) {
-        p->position = glm::vec3(p->position.x, p->position.y, zmin);
+        p->position = glm::vec3(p->position.x, p->position.y, zmin + eps);
         p->velocity = glm::vec3(p->velocity.x, p->velocity.y, -d*p->velocity.z);
     } else if (p->position.z > zmax) {
-        p->position = glm::vec3(p->position.x, p->position.y, zmax);
+        p->position = glm::vec3(p->position.x, p->position.y, zmax - eps);
         p->velocity = glm::vec3(p->velocity.x, p->velocity.y, -d*p->velocity.z);
     }
+
 }
 
 void SPHFluidSimulation::updateFluidPosition(double dt) {

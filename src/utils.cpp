@@ -282,5 +282,102 @@ namespace utils {
         return lOrigin + d * lDir;
     }
 
+    std::vector<glm::vec3> createPointPanel(float width, float height,
+                                            float spacing, int numLayers,
+                                            glm::vec3 w, glm::vec3 h,
+                                            bool isStaggered) {
+
+        // adjust spacing to fit width/height constraints
+        int spaces = floor(width/spacing);
+        float xpad = width/spaces;
+        int nx = spaces+1;
+
+        spaces = floor(height/spacing);
+        float ypad = height/spaces;
+        int ny = spaces + 1;
+
+        float zpad = spacing;
+        int nz = numLayers;
+
+        w = glm::normalize(w);
+        h = glm::normalize(h);
+        glm::vec3 normal = glm::cross(w, h);
+
+        std::vector<glm::vec3> points;
+        glm::vec3 start = (float)(-0.5*width)*w -
+                          (float)(0.5*height)*h -
+                          (float)(0.5*(nz-1)*zpad)*normal;
+        for (int k=0; k<nz; k++) {
+            for (int j=0; j<ny; j++) {
+                for (int i=0; i<nx; i++) {
+                    glm::vec3 p = start + i*xpad*w + j*ypad*h + k*zpad*normal;
+                    points.push_back(p);
+
+                    if (isStaggered && i != nx-1 && j != ny-1 && (k != nz-1 || nz == 1)) {
+                        p = p + (float)(0.5*xpad)*w +
+                                (float)(0.5*ypad)*h +
+                                (float)(0.5*zpad)*normal;
+                        points.push_back(p);
+                    }
+                }
+            }
+        }
+
+        return points;
+    }
+
+    std::vector<glm::vec3> rotatePoints(std::vector<glm::vec3> points, Quaternion q) {
+        glm::mat4 rot = q.getRotationMatrix();
+        std::vector<glm::vec3> newPoints;
+        for (uint i=0; i<points.size(); i++) {
+            glm::vec4 t = glm::vec4(points[i].x, points[i].y, points[i].z, 1.0);
+            t = rot*t;
+            newPoints.push_back(glm::vec3(t.x, t.y, t.z));
+        }
+
+        return newPoints;
+    }
+
+
+    std::vector<glm::vec3> translatePoints(std::vector<glm::vec3> points, glm::vec3 trans) {
+        std::vector<glm::vec3> newPoints;
+        for (uint i=0; i<points.size(); i++) {
+            newPoints.push_back(points[i] + trans);
+        }
+
+        return newPoints;
+    }
+
+    std::vector<glm::vec3> mergePoints(std::vector<glm::vec3> points1,
+                                       std::vector<glm::vec3> points2) {
+        for (uint i=0; i<points2.size(); i++) {
+            points1.push_back(points2[i]);
+        }
+
+        return points1;
+    }
+
+    void drawPoints(std::vector<glm::vec3> points) {
+        glBegin(GL_POINTS);
+        for (uint i=0; i<points.size(); i++) {
+            glVertex3f(points[i].x, points[i].y, points[i].z);
+        }
+        glEnd();
+    }
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 

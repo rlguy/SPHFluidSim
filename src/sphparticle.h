@@ -24,6 +24,7 @@ struct SPHParticle {
     bool isHalfTimeStepVelocityInitialized;
     bool isObstacle;
     bool isMarkedForRemoval = false;
+    bool isVisible = true;
 };
 
 

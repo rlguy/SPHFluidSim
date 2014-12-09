@@ -4,7 +4,9 @@
 #include <GL/glu.h>
 #include <glm/glm.hpp>
 #include <vector>
+#include <cmath>
 #include "camera3d.h"
+#include "quaternion.h"
 
 namespace utils {
     void drawGrid();
@@ -23,6 +25,15 @@ namespace utils {
     float easeInOut(float t, float t1, float t2);
     glm::vec3 linePlaneIntersection(glm::vec3 lOrigin, glm::vec3 lDir,
                                     glm::vec3 pOrigin, glm::vec3 pNormal);
+
+    std::vector<glm::vec3> createPointPanel(float width, float height,
+                                            float spacing, int numLayers,
+                                            glm::vec3 w, glm::vec3 h, bool isStaggered);
+    std::vector<glm::vec3> translatePoints(std::vector<glm::vec3> points, glm::vec3 trans);
+    std::vector<glm::vec3> rotatePoints(std::vector<glm::vec3> points, Quaternion q);
+    std::vector<glm::vec3> mergePoints(std::vector<glm::vec3> points1,
+                                       std::vector<glm::vec3> points2);
+    void drawPoints(std::vector<glm::vec3> points);
 
 }
 

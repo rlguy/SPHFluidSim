@@ -64,6 +64,7 @@ private:
     inline double evaluateSpeedOfSound(SPHParticle *sp);
     inline double evaluateSpeedOfSoundSquared(SPHParticle *sp);
     void removeSPHParticlesMarkedForRemoval();
+    void initializeBoundaryParticles();
     void updateFluidConstants();
     void updateObstacleVelocity(double dt);
     void updateGrid();
@@ -110,6 +111,9 @@ private:
     double ymax = 1.0;
     double zmin = 0.0;
     double zmax = 1.0;
+    int boundaryObstacleID;
+    bool isBoundaryObstacleInitialized = false;
+    bool isBoundaryParticlesEnabled;
 
     SpatialGrid grid;
     std::vector<SPHParticle*> fluidParticles;

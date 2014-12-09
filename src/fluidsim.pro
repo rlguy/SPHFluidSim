@@ -14,7 +14,8 @@ HEADERS       = glwidget.h \
     sphfluidsimulation.h \
     sphparticle.h \
     stopwatch.h \
-    sphobstacle.h
+    sphobstacle.h \
+    gradients.h
 SOURCES       = glwidget.cpp \
                 main.cpp \
                 window.cpp \
@@ -25,7 +26,8 @@ SOURCES       = glwidget.cpp \
     cellhash.cpp \
     gridcell.cpp \
     sphfluidsimulation.cpp \
-    stopwatch.cpp
+    stopwatch.cpp \
+    gradients.cpp
 QT           += opengl widgets
 
 QMAKE_CXXFLAGS += -std=c++0x

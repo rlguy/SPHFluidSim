@@ -38,6 +38,7 @@ public:
     void setDampingConstant(double c);
     std::vector<SPHParticle*> getFluidParticles();
     float getParticleSize();
+    float getInitialDensity();
 
 private:
 
@@ -52,6 +53,7 @@ private:
     int getUniqueObstacleID();
     int currentObstacleID = 0;
 
+    void updateFluidConstants();
     void updateGrid();
     void updateNearestNeighbours();
     void updateFluidDensityAndPressure();
@@ -59,6 +61,7 @@ private:
     void updateFluidAcceleration();
     void updateFluidPosition(double dt);
     void enforceFluidParticlePositionBounds(SPHParticle *p);
+    bool isEnforcingFluidParticlePositionBoundsThisTimeStep = false;
     double calculateTimeStep();
 
     // simulation constants
@@ -78,6 +81,7 @@ private:
     double viscosityCoefficient;
     double maximumVelocity;
     double maximumAcceleration;
+    bool displaySimulationConsoleOutput;
 
     // kernel constants
     double poly6Coefficient;
@@ -87,7 +91,7 @@ private:
     // boundary constraints
     double boundaryForceRadius = 0.1;
     double minBoundaryForce = 0.0;
-    double maxBoundaryForce = 2.0;
+    double maxBoundaryForce = 0.0;
     double xmin = 0.0;
     double xmax = 1.0;
     double ymin = 0.0;

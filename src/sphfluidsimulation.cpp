@@ -28,19 +28,24 @@ void SPHFluidSimulation::initSimulationConstants() {
     LuaRef t = getGlobal(L, "settings");
 
     hsq = h*h;
-    ratioOfSpecificHeats        = t["ratioOfSpecificHeats"].cast<double>();
-    pressureCoefficient         = t["pressureCoefficient"].cast<double>();
-    initialDensity              = t["initialDensity"].cast<double>();
-    viscosityCoefficient        = t["viscosityCoefficient"].cast<double>();
-    particleMass                = t["particleMass"].cast<double>();
-    maximumVelocity             = t["maximumVelocity"].cast<double>();
-    maximumAcceleration         = t["maximumAcceleration"].cast<double>();
-    motionDampingCoefficient    = t["motionDampingCoefficient"].cast<double>();
-    boundaryDampingCoefficient  = t["boundaryDampingCoefficient"].cast<double>();
-    gravityMagnitude            = t["gravityMagnitude"].cast<double>();
-    isMotionDampingEnabled      = t["isMotionDampingEnabled"].cast<bool>();
+    ratioOfSpecificHeats           = t["ratioOfSpecificHeats"].cast<double>();
+    pressureCoefficient            = t["pressureCoefficient"].cast<double>();
+    initialDensity                 = t["initialDensity"].cast<double>();
+    viscosityCoefficient           = t["viscosityCoefficient"].cast<double>();
+    particleMass                   = t["particleMass"].cast<double>();
+    maximumVelocity                = t["maximumVelocity"].cast<double>();
+    maximumAcceleration            = t["maximumAcceleration"].cast<double>();
+    motionDampingCoefficient       = t["motionDampingCoefficient"].cast<double>();
+    boundaryDampingCoefficient     = t["boundaryDampingCoefficient"].cast<double>();
+    gravityMagnitude               = t["gravityMagnitude"].cast<double>();
+    isMotionDampingEnabled         = t["isMotionDampingEnabled"].cast<bool>();
+    displaySimulationConsoleOutput = t["displaySimulationConsoleOutput"].cast<bool>();
 
     gravityForce = glm::vec3(0.0, -gravityMagnitude, 0.0);
+}
+
+void SPHFluidSimulation::updateFluidConstants() {
+    initSimulationConstants();
 }
 
 void SPHFluidSimulation::initKernelConstants() {
@@ -57,6 +62,8 @@ void SPHFluidSimulation::setBounds(double _xmin, double _xmax,
     xmin = _xmin; xmax = _xmax;
     ymin = _ymin; ymax = _ymax;
     zmin = _zmin; zmax = _zmax;
+
+    isEnforcingFluidParticlePositionBoundsThisTimeStep = true;
 }
 
 void SPHFluidSimulation::setDampingConstant(double c) {
@@ -69,6 +76,10 @@ std::vector<SPHParticle*> SPHFluidSimulation::getFluidParticles() {
 
 float SPHFluidSimulation::getParticleSize() {
     return h;
+}
+
+float SPHFluidSimulation::getInitialDensity() {
+    return initialDensity;
 }
 
 void SPHFluidSimulation::addFluidParticles(std::vector<glm::vec3> points) {
@@ -308,6 +319,9 @@ void SPHFluidSimulation::updateFluidAcceleration() {
 }
 
 void SPHFluidSimulation::enforceFluidParticlePositionBounds(SPHParticle *p) {
+    if (!isEnforcingFluidParticlePositionBoundsThisTimeStep) {
+        return;
+    }
 
     float d = boundaryDampingCoefficient;
     if (p->position.x < xmin) {
@@ -405,12 +419,12 @@ glm::vec3 SPHFluidSimulation::calculateBoundaryAcceleration(SPHParticle *sp) {
 }
 
 void SPHFluidSimulation::update(float dt) {
-    int numSteps = 0;
+    updateFluidConstants();
 
     StopWatch t1 = StopWatch();
     StopWatch t2 = StopWatch();
-
     t1.start();
+    int numSteps = 0;
     double timeLeft = dt;
     while (timeLeft > 0.0) {
 
@@ -436,8 +450,21 @@ void SPHFluidSimulation::update(float dt) {
     //qDebug() << numSteps;
     t1.stop();
 
-    //qDebug() << "update:" << t1.getTime() << "neighbours:" << t2.getTime() <<
-    //           "pct:" << (t2.getTime()/t1.getTime())*100.0;
+    using namespace luabridge;
+    lua_State* L = luaL_newstate();
+    luaL_openlibs(L);
+
+    if (luaL_dofile(L, "scripts/fluid_config.lua") != 0) {
+        qDebug() << "Error loading script";
+        exit(1);
+    }
+    LuaRef t = getGlobal(L, "settings");
+    bool displayOutput = t["displaySimulationConsoleOutput"].cast<bool>();
+
+    if (displayOutput) {
+        qDebug() << "update:" << t1.getTime() << "neighbours:" << t2.getTime() <<
+                   "pct:" << (t2.getTime()/t1.getTime())*100.0;
+    }
 
 }
 

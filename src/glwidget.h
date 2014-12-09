@@ -62,11 +62,19 @@
 #include <stdlib.h>     /* srand, rand */
 #include <time.h>       /* time */
 #include <QImage>
+#include <cmath>
 #include "glm/glm.hpp"
 #include "camera3d.h"
 #include "utils.h"
 #include "spatialgrid.h"
 #include "sphfluidsimulation.h"
+
+extern "C" {
+# include "lua/lua.h"
+# include "lua/lauxlib.h"
+# include "lua/lualib.h"
+}
+#include "LuaBridge/LuaBridge.h"
 
 class QtLogo;
 
@@ -111,6 +119,7 @@ private:
     void drawAnimation();
     void drawBillboard(GLuint *tex, glm::vec3 p, float width);
     void initializeSimulation();
+    void activateSimulation();
     void stopSimulation();
     void writeFrame();
     bool saveFrameToFile(QString fileName);
@@ -147,6 +156,9 @@ private:
     GLuint texture[1];
 
     SPHFluidSimulation fluidSim;
+    std::vector<std::array<double, 3>> fluidGradient;
+    double minColorDensity = 0.0;
+    double maxColorDensity = 100.0;
 };
 
 #endif

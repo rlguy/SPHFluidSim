@@ -59,6 +59,7 @@
 #include "glwidget.h"
 #include "glm/glm.hpp"
 #include "quaternion.h"
+#include "gradients.h"
 
 #ifndef GL_MULTISAMPLE
 #define GL_MULTISAMPLE  0x809D
@@ -73,7 +74,7 @@ GLWidget::GLWidget(QWidget *parent)
     screenHeight = 600;
 
     //initializealize update/draw timers
-    float updatesPerSecond = 30;
+    float updatesPerSecond = 60;
 
     updateTimer = new QTimer(this);
     connect(updateTimer, SIGNAL(timeout()), this, SLOT(updateSimulation()));
@@ -83,8 +84,8 @@ GLWidget::GLWidget(QWidget *parent)
     deltaTimer->start();
 
     // Initialize camera
-    glm::vec3 pos = glm::vec3(25, 10.0, 3.0);
-    glm::vec3 dir = glm::normalize(glm::vec3(-pos.x, -pos.y, -0.0));
+    glm::vec3 pos = glm::vec3(14.0, 15.0, 33.0);
+    glm::vec3 dir = glm::normalize(glm::vec3(-pos.x, -pos.y, -pos.z));
     camera = camera3d(pos, dir, screenWidth, screenHeight,
                       60.0, 0.5, 100.0);
 
@@ -109,33 +110,7 @@ GLWidget::GLWidget(QWidget *parent)
     runningTime = 0.0;
     currentFrame = 0;
 
-
-    double radius = 0.2;
-    fluidSim = SPHFluidSimulation(radius);
-
-    std::vector<glm::vec3> points;
-
-    double minx = 0.0;
-    double maxx = 3.0;
-    double miny = 0.0;
-    double maxy = 8.0;
-    double minz = 0.0;
-    double maxz = 3.0;
-    double rx = 1.0;
-    double ry = 0.5;
-    double rz = 1.0;
-
-    fluidSim.setBounds(minx, maxx, miny, maxy, minz, maxz);
-    double n = 100;
-    for (int i=0; i<n; i++) {
-        float x = minx + rx*((float)rand()/RAND_MAX) * (maxx - minx);
-        float y = miny + ry*((float)rand()/RAND_MAX) * (maxy - miny);
-        float z = minz + rz*((float)rand()/RAND_MAX) * (maxz - minz);
-        glm::vec3 p = glm::vec3(x, y, z);
-        points.push_back(p);
-    }
-    fluidSim.addFluidParticles(points);
-    fluidSim.setDampingConstant(8.0);
+    initializeSimulation();
 
     /*
     float pad = 1.05*radius;
@@ -204,31 +179,6 @@ GLWidget::GLWidget(QWidget *parent)
     }
     int id = fluidSim.addObstacleParticles(obstaclePoints);
     */
-
-    /*
-    QImage img;
-    if( !img.load("images/ball.bmp") ) {
-        qDebug() << "error loading image";
-        exit(1);
-    }
-
-    QImage GL_formatted_image;
-    GL_formatted_image = QGLWidget::convertToGLFormat(img);
-    if( GL_formatted_image.isNull() ) {
-        qDebug() << "error formatting";
-    }
-
-    glGenTextures(1, texture);
-    glBindTexture(GL_TEXTURE_2D, texture[0]);
-    glTexImage2D( GL_TEXTURE_2D, 0, GL_RGBA,
-            GL_formatted_image.width(), GL_formatted_image.height(),
-            0, GL_RGBA, GL_UNSIGNED_BYTE, GL_formatted_image.bits() );
-    glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MIN_FILTER,GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D,GL_TEXTURE_MAG_FILTER,GL_LINEAR);
-    */
-
-
-
 }
 
 GLWidget::~GLWidget()
@@ -289,6 +239,73 @@ void GLWidget::updateCameraMovement(float dt) {
 }
 
 void GLWidget::initializeSimulation() {
+    using namespace luabridge;
+
+    lua_State* L = luaL_newstate();
+    luaL_openlibs(L);
+
+    if (luaL_dofile(L, "scripts/fluid_config.lua") != 0) {
+        qDebug() << "Error loading script";
+        exit(1);
+    }
+    LuaRef t = getGlobal(L, "settings");
+
+    double radius = t["smoothingRadius"].cast<double>();
+    fluidSim = SPHFluidSimulation(radius);
+
+    LuaRef bounds = t["initialBounds"];
+    double minx = bounds["minx"].cast<double>();
+    double maxx = bounds["maxx"].cast<double>();
+    double miny = bounds["miny"].cast<double>();
+    double maxy = bounds["maxy"].cast<double>();
+    double minz = bounds["minz"].cast<double>();
+    double maxz = bounds["maxz"].cast<double>();
+    double rx = 1.0;
+    double ry = 0.8;
+    double rz = 1.0;
+
+    fluidSim.setBounds(minx, maxx, miny, maxy, minz, maxz);
+    std::vector<glm::vec3> points;
+    double n = t["numParticles"].cast<int>();
+    for (int i=0; i<n; i++) {
+        float x = minx + rx*((float)rand()/RAND_MAX) * (maxx - minx);
+        float y = miny + ry*((float)rand()/RAND_MAX) * (maxy - miny);
+        float z = minz + rz*((float)rand()/RAND_MAX) * (maxz - minz);
+        glm::vec3 p = glm::vec3(x, y, z);
+        points.push_back(p);
+    }
+    fluidSim.addFluidParticles(points);
+
+    double damp = t["initialDampingConstant"].cast<double>();
+    fluidSim.setDampingConstant(damp);
+
+    fluidGradient = Gradients::getSkyblueGradient();
+    minColorDensity = fluidSim.getInitialDensity();
+}
+
+void GLWidget::activateSimulation() {
+    using namespace luabridge;
+
+    lua_State* L = luaL_newstate();
+    luaL_openlibs(L);
+
+    if (luaL_dofile(L, "scripts/fluid_config.lua") != 0) {
+        qDebug() << "Error loading script";
+        exit(1);
+    }
+    LuaRef t = getGlobal(L, "settings");
+    LuaRef bounds = t["finalBounds"];
+    double minx = bounds["minx"].cast<double>();
+    double maxx = bounds["maxx"].cast<double>();
+    double miny = bounds["miny"].cast<double>();
+    double maxy = bounds["maxy"].cast<double>();
+    double minz = bounds["minz"].cast<double>();
+    double maxz = bounds["maxz"].cast<double>();
+    fluidSim.setBounds(minx, maxx, miny, maxy, minz, maxz);
+
+    double damp = t["finalDampingConstant"].cast<double>();
+    fluidSim.setDampingConstant(damp);
+    isRendering = true;
 }
 
 void GLWidget::stopSimulation() {
@@ -303,11 +320,23 @@ void GLWidget::updateSimulation() {
 
     dt *= deltaTimeModifier;  // speed of simulation
 
-    dt = 1.0/30.0;
+    dt = 1.0/60.0;
 
-    // fluidSim test
+    // fluidSimulation
+    using namespace luabridge;
+
+    lua_State* L = luaL_newstate();
+    luaL_openlibs(L);
+
+    if (luaL_dofile(L, "scripts/fluid_config.lua") != 0) {
+        qDebug() << "Error loading script";
+        exit(1);
+    }
+    LuaRef t = getGlobal(L, "settings");
+    bool isRenderingEnabled = t["isRenderingEnabled"].cast<bool>();
+
     fluidSim.update(dt);
-    if (isRendering) {
+    if (isRendering && isRenderingEnabled) {
         writeFrame();
     } else {
         updateGL();
@@ -403,14 +432,23 @@ void GLWidget::paintGL()
     glMultMatrixf((GLfloat*)&scaleMat);
     fluidSim.draw();
 
-    glColor3f(1.0, 0.4, 0.0);
+    // draw fluid particles. Color by density value.
     std::vector<SPHParticle*> particles = fluidSim.getFluidParticles();
     float size = 0.5*fluidSim.getParticleSize();
     for (uint i=0; i<particles.size(); i++) {
         glm::vec3 p = particles[i]->position;
-        drawBillboard(&texture[0], p, size);
-    }
+        double density = particles[i]->density;
+        double t = (density - minColorDensity) / (maxColorDensity - minColorDensity);
+        t = fmax(0.0, t);
+        t = fmin(1.0, t);
+        int cidx = floor(utils::lerp(50.0, fluidGradient.size()-1, 1-t));
 
+        glColor3f(fluidGradient[cidx][0],
+                  fluidGradient[cidx][1],
+                  fluidGradient[cidx][2]);
+        drawBillboard(&texture[0], p, size);
+
+    }
     glPopMatrix();
 
 
@@ -471,9 +509,7 @@ void GLWidget::keyReleaseEvent(QKeyEvent *event)
     }
 
     if (event->key() == Qt::Key_H) {
-        fluidSim.setDampingConstant(0);
-        fluidSim.setBounds(0.0, 8.0, 0.0, 8.0, 0.0, 8.0);
-        isRendering = true;
+        activateSimulation();
     }
 
 }

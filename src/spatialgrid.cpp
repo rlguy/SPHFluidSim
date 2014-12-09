@@ -24,6 +24,7 @@ int SpatialGrid::insertPoint(glm::vec3 p) {
     GridPoint *point = new GridPoint();
     point->position = p;
     point->id = generateUniqueGridPointID();
+    point->isMarkedForRemoval = false;
     points.push_back(point);
 
     std::pair<int,GridPoint*> pair(point->id, point);
@@ -149,6 +150,35 @@ void SpatialGrid::movePoint(int id, glm::vec3 newPos) {
     }
 }
 
+void SpatialGrid::removePoint(int id) {
+    if (gridPointsByID.find(id) == gridPointsByID.end()) {
+        return;
+    }
+    isCellRemoved = true;
+
+    GridPoint *point = gridPointsByID[id];
+    gridPointsByID.erase(id);
+
+    int i = point->i;
+    int j = point->j;
+    int k = point->k;
+
+    point->isMarkedForRemoval = true;
+    bool isCellInTable = false;
+    GridCell *cell = cellHashTable.findGridCell(i, j, k, &isCellInTable);
+
+    if (!isCellInTable) {
+        return;
+    }
+
+    cell->removeGridPoint(point);
+    if (cell->isEmpty()) {
+        cellHashTable.removeGridCell(cell);
+        cell->reset();
+        freeCells.push_back(cell);
+    }
+}
+
 std::vector<glm::vec3> SpatialGrid::getObjectsInRadiusOfPoint(int ref, double r) {
     std::vector<glm::vec3> objects;
 
@@ -266,7 +296,6 @@ std::vector<int> SpatialGrid::getIDsInRadiusOfPoint(int ref, double r) {
     if (imax - imin <= 3 and imax - imin >= 1) {
         return fastIDNeighbourSearch(ref, r, p);
     }
-    //qDebug() << p->position.x << p->position.y << p->position.z << ref;
 
     std::vector<int> objects;
     GridPoint *gp;
@@ -299,7 +328,27 @@ std::vector<int> SpatialGrid::getIDsInRadiusOfPoint(int ref, double r) {
     return objects;
 }
 
+void SpatialGrid::removeGridPointsMarkedForRemoval() {
+    if (points.size() == 0 || !isCellRemoved) {
+        return;
+    }
+
+    GridPoint *p;
+    for (int i=(int)points.size()-1; i>=0; i--) {
+        if (points[i]->isMarkedForRemoval) {
+            p = points[i];
+            points.erase(points.begin() + i);
+
+            delete p;
+        }
+    }
+
+    isCellRemoved = false;
+}
+
 void SpatialGrid::update() {
+    removeGridPointsMarkedForRemoval();
+
     // update each cell's cell neighbours
     std::vector<GridCell*> cells;
     cellHashTable.getGridCells(&cells);
@@ -354,25 +403,6 @@ void SpatialGrid::draw() {
         pos = pos + glm::vec3(0.5*size, 0.5*size, 0.5*size);
         utils::drawWireframeCube(pos, size);
     }
-
-    /*
-    timespec ts_beg, ts_end;
-    clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &ts_beg);
-
-    float avg = 0;
-    double r = 0.5;
-    for (int i=0; i<(int)points.size(); i++) {
-      GridPoint *p = points[i];
-      std::vector<glm::vec3> objects = getObjectsInRadiusOfPoint(p->id, r);
-      avg += objects.size();
-    }
-    avg /= points.size();
-
-    clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &ts_end);
-
-    qDebug() << "average neighbours" << avg << (ts_end.tv_sec - ts_beg.tv_sec) +
-                                (ts_end.tv_nsec - ts_beg.tv_nsec) / 1e9 << " sec";
-    */
 }
 
 

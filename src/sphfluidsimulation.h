@@ -33,6 +33,7 @@ public:
     void addFluidParticles(std::vector<glm::vec3> points);
     void addFluidParticle(glm::vec3 pos, glm::vec3 velocity);
     int addObstacleParticles(std::vector<glm::vec3> points);
+    void removeObstacle(int id);
 
     void setBounds(double xmin, double xmax,
                    double ymin, double ymax,
@@ -62,6 +63,7 @@ private:
     // simulation
     inline double evaluateSpeedOfSound(SPHParticle *sp);
     inline double evaluateSpeedOfSoundSquared(SPHParticle *sp);
+    void removeSPHParticlesMarkedForRemoval();
     void updateFluidConstants();
     void updateObstacleVelocity(double dt);
     void updateGrid();
@@ -116,7 +118,7 @@ private:
     std::vector<SPHObstacle*> obstacles;
     std::unordered_map<int,SPHParticle*> particlesByGridID;
     std::unordered_map<int,SPHObstacle*> obstaclesByID;
-
+    bool isSPHParticleRemoved = false;
 };
 
 #endif // SPHFLUIDSIMULATION_H

@@ -12,4 +12,5 @@ struct GridPoint {
     double tx, ty, tz;
     int i, j, k;
     bool isInGridCell = false;
+    bool isMarkedForRemoval = false;
 };

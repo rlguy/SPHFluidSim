@@ -23,6 +23,7 @@ struct SPHParticle {
     int gridID;  // used for spatial grid lookup
     bool isHalfTimeStepVelocityInitialized;
     bool isObstacle;
+    bool isMarkedForRemoval = false;
 };
 
 

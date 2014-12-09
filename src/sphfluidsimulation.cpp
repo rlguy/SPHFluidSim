@@ -109,6 +109,34 @@ int SPHFluidSimulation::addObstacleParticles(std::vector<glm::vec3> points) {
     return obs->id;
 }
 
+void SPHFluidSimulation::removeObstacle(int id) {
+    if (obstaclesByID.find(id) == obstaclesByID.end()) {
+        return;
+    }
+    isSPHParticleRemoved = true;
+
+    SPHObstacle *o = obstaclesByID[id];
+    obstaclesByID.erase(id);
+
+    SPHParticle *p;
+    for (uint i=0; i<o->particles.size(); i++) {
+        p = o->particles[i];
+        grid.removePoint(p->gridID);
+        particlesByGridID.erase(p->gridID);
+        p->isMarkedForRemoval = true;
+    }
+
+    for (uint i=0; i<obstacles.size(); i++) {
+        SPHObstacle *op = obstacles[i];
+        if (op->id == o->id) {
+            obstacles.erase(obstacles.begin() + i);
+            break;
+        }
+    }
+
+    delete o;
+}
+
 void SPHFluidSimulation::setObstaclePosition(int id, glm::vec3 pos) {
     if (obstaclesByID.find(id) == obstaclesByID.end()) {
         return;
@@ -232,6 +260,37 @@ inline double SPHFluidSimulation::evaluateSpeedOfSoundSquared(SPHParticle *sp) {
         return 0.0;
     }
     return ratioOfSpecificHeats*(sp->pressure)/sp->density;
+}
+
+void SPHFluidSimulation::removeSPHParticlesMarkedForRemoval() {
+    if (allParticles.size() == 0 || !isSPHParticleRemoved) {
+        return;
+    }
+
+    SPHParticle *p;
+    for (int i=(int)fluidParticles.size() - 1; i>=0; i--) {
+        if (fluidParticles[i]->isMarkedForRemoval) {
+            p = fluidParticles[i];
+            fluidParticles.erase(fluidParticles.begin() + i);
+        }
+    }
+
+    for (int i=(int)obstacleParticles.size() - 1; i>=0; i--) {
+        if (obstacleParticles[i]->isMarkedForRemoval) {
+            p = obstacleParticles[i];
+            obstacleParticles.erase(obstacleParticles.begin() + i);
+        }
+    }
+
+    for (int i=(int)allParticles.size() - 1; i>=0; i--) {
+        if (allParticles[i]->isMarkedForRemoval) {
+            p = allParticles[i];
+            allParticles.erase(allParticles.begin() + i);
+            delete p;
+        }
+    }
+
+    isSPHParticleRemoved = false;
 }
 
 
@@ -498,6 +557,7 @@ glm::vec3 SPHFluidSimulation::calculateBoundaryAcceleration(SPHParticle *sp) {
 
 void SPHFluidSimulation::update(float dt) {
     updateFluidConstants();
+    removeSPHParticlesMarkedForRemoval();
 
     StopWatch t1 = StopWatch();
     StopWatch t2 = StopWatch();

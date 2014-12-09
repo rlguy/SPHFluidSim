@@ -19,6 +19,7 @@ public:
     SpatialGrid(double cell_size);
     int insertPoint(glm::vec3 point);
     void movePoint(int id, glm::vec3 position);
+    void removePoint(int id);
     std::vector<glm::vec3> getObjectsInRadiusOfPoint(int ref, double radius);
     std::vector<int> getIDsInRadiusOfPoint(int ref, double radius);
     void update();
@@ -33,6 +34,7 @@ private:
     GridCell* getNewGridCell(int i, int j, int k);
     void updateGridPointCellOffset(GridPoint *gp, int i, int j, int k);
     std::vector<int> fastIDNeighbourSearch(int ref, double r, GridPoint *gp);
+    void removeGridPointsMarkedForRemoval();
 
     double size;
     int currentGridPointID;
@@ -41,6 +43,7 @@ private:
     std::vector<GridCell*> freeCells;
     int numInitialFreeCells;
     CellHash cellHashTable;
+    bool isCellRemoved = false;
 };
 
 #endif // SPATIALGRID_H

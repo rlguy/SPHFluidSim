@@ -74,6 +74,10 @@ std::vector<SPHParticle*> SPHFluidSimulation::getFluidParticles() {
     return fluidParticles;
 }
 
+std::vector<SPHParticle*> SPHFluidSimulation::getObstacleParticles() {
+    return obstacleParticles;
+}
+
 float SPHFluidSimulation::getParticleSize() {
     return h;
 }
@@ -105,6 +109,52 @@ int SPHFluidSimulation::addObstacleParticles(std::vector<glm::vec3> points) {
     return obs->id;
 }
 
+void SPHFluidSimulation::setObstaclePosition(int id, glm::vec3 pos) {
+    if (obstaclesByID.find(id) == obstaclesByID.end()) {
+        return;
+    }
+    SPHObstacle *o = obstaclesByID[id];
+    translateObstacle(id, pos - o->position);
+}
+
+void SPHFluidSimulation::translateObstacle(int id, glm::vec3 trans) {
+    if (obstaclesByID.find(id) == obstaclesByID.end()) {
+        return;
+    }
+    SPHObstacle *o = obstaclesByID[id];
+
+    SPHParticle *sp;
+    for (uint i=0; i<o->particles.size(); i++) {
+        sp = o->particles[i];
+        sp->position += trans;
+    }
+
+    o->position += trans;
+}
+
+void SPHFluidSimulation::rotateObstacle(int id, Quaternion q) {
+    if (obstaclesByID.find(id) == obstaclesByID.end()) {
+        return;
+    }
+
+    SPHObstacle *o = obstaclesByID[id];
+    glm::mat4 rot = q.getRotationMatrix();
+
+    SPHParticle *sp;
+    glm::vec3 op = o->position;
+    glm::vec4 p;
+    for (uint i=0; i<o->particles.size(); i++) {
+        sp = o->particles[i];
+        p = glm::vec4(sp->position.x - op.x,
+                      sp->position.y - op.y,
+                      sp->position.z - op.z, 1.0);
+        p = rot*p;
+
+        sp->position = glm::vec3(p.x + op.x, p.y + op.y, p.z + op.z);
+    }
+
+}
+
 int SPHFluidSimulation::getUniqueObstacleID() {
     int id = currentObstacleID;
     currentObstacleID++;
@@ -115,6 +165,7 @@ SPHParticle* SPHFluidSimulation::createSPHParticle(glm::vec3 pos, glm::vec3 velo
     SPHParticle *s = new SPHParticle();
 
     s->position = pos;
+    s->prevPosition = pos;
     s->velocity = velocity;
     s->velocityAtHalfTimeStep = glm::vec3(0.0, 0.0, 0.0);
     s->isHalfTimeStepVelocityInitialized = false;
@@ -225,8 +276,8 @@ double SPHFluidSimulation::calculateTimeStep() {
 
 void SPHFluidSimulation::updateNearestNeighbours() {
     SPHParticle *sp;
-    for (uint i=0; i<fluidParticles.size(); i++) {
-        sp = fluidParticles[i];
+    for (uint i=0; i<allParticles.size(); i++) {
+        sp = allParticles[i];
         sp->neighbours.clear();
         std::vector<int> refs = grid.getIDsInRadiusOfPoint(sp->gridID, h);
         for (uint j=0; j<refs.size(); j++) {
@@ -235,12 +286,41 @@ void SPHFluidSimulation::updateNearestNeighbours() {
     }
 }
 
+void SPHFluidSimulation::updateObstacleVelocity(double dt) {
+    SPHObstacle *obs;
+    SPHParticle *sp;
+    glm::vec3 trans;
+    for (uint i=0; i<obstacles.size(); i++) {
+        obs = obstacles[i];
+
+        for (uint j=0; j<obs->particles.size(); j++) {
+            sp = obs->particles[j];
+
+            if (sp->position == sp->prevPosition) {
+                sp->velocity = glm::vec3(0.0, 0.0, 0.0);
+            }
+
+            trans = sp->position - sp->prevPosition;
+            double dist = glm::length(trans);
+            double eps = 0.00000001;
+            if (dist > eps) {
+                float speed = fmin((dist/dt), maximumVelocity);
+                sp->velocity = (trans / (float)dist) * speed;
+            } else {
+                sp->velocity = glm::vec3(0.0, 0.0, 0.0);
+            }
+
+            sp->prevPosition = sp->position;
+        }
+    }
+}
+
 void SPHFluidSimulation::updateFluidDensityAndPressure() {
     // once we find a particle's density, we can find it's pressure
     SPHParticle *pi, *pj;
     glm::vec3 r;
-    for (uint i=0; i<fluidParticles.size(); i++) {
-        pi = fluidParticles[i];
+    for (uint i=0; i<allParticles.size(); i++) {
+        pi = allParticles[i];
         double density = 0.0;
 
         for (uint j=0; j<pi->neighbours.size(); j++) {
@@ -254,8 +334,6 @@ void SPHFluidSimulation::updateFluidDensityAndPressure() {
         pi->density = fmax(density, initialDensity);  // less than initial density
                                                       // produces negative pressures
         pi->pressure = pressureCoefficient*(pi->density - initialDensity);
-
-
     }
 }
 
@@ -446,6 +524,7 @@ void SPHFluidSimulation::update(float dt) {
         numSteps += 1;
 
         updateFluidPosition((double)timeStep);
+        updateObstacleVelocity((double)timeStep);
     }
     //qDebug() << numSteps;
     t1.stop();
@@ -481,13 +560,16 @@ void SPHFluidSimulation::draw() {
     }
     */
 
-    //glColor4f(0.0, 0.0, 0.0, 0.1);
+    /*
+    glPointSize(5.0);
+    glColor3f(1.0, 0.0, 0.0);
+    glBegin(GL_POINTS);
     for (uint i=0; i<obstacleParticles.size(); i++) {
-        //glm::vec3 p = obstacleParticles[i]->position;
-        //glVertex3f(p.x, p.y, p.z);
+        glm::vec3 p = obstacleParticles[i]->position;
+        glVertex3f(p.x, p.y, p.z);
     }
-
     glEnd();
+    */
 
     double w = xmax - xmin;
     double h = ymax - ymin;

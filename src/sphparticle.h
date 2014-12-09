@@ -9,6 +9,7 @@
 
 struct SPHParticle {
     glm::vec3 position;
+    glm::vec3 prevPosition;   // only used for obstacles
     glm::vec3 velocity;
     glm::vec3 velocityAtHalfTimeStep;
     glm::vec3 XSPHVelocity;

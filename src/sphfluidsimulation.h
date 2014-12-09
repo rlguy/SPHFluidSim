@@ -12,6 +12,7 @@
 #include "sphparticle.h"
 #include "sphobstacle.h"
 #include "stopwatch.h"
+#include "quaternion.h"
 
 extern "C" {
 # include "lua/lua.h"
@@ -28,6 +29,7 @@ public:
     void update(float dt);
     void draw();
 
+    // user functions
     void addFluidParticles(std::vector<glm::vec3> points);
     void addFluidParticle(glm::vec3 pos, glm::vec3 velocity);
     int addObstacleParticles(std::vector<glm::vec3> points);
@@ -37,23 +39,31 @@ public:
                    double zmin, double zmax);
     void setDampingConstant(double c);
     std::vector<SPHParticle*> getFluidParticles();
+    std::vector<SPHParticle*> getObstacleParticles();
     float getParticleSize();
     float getInitialDensity();
 
+    void setObstaclePosition(int id, glm::vec3 pos);
+    void translateObstacle(int id, glm::vec3 trans);
+    void rotateObstacle(int id, Quaternion q);
+
 private:
 
+    // init
     void initSimulationConstants();
     void initKernelConstants();
-    inline double evaluateSpeedOfSound(SPHParticle *sp);
-    inline double evaluateSpeedOfSoundSquared(SPHParticle *sp);
+
     SPHParticle* createSPHParticle(glm::vec3 pos, glm::vec3 velocity);
     SPHParticle* createSPHObstacleParticle(glm::vec3 pos);
-
     SPHParticle* addObstacleParticle(glm::vec3 pos);
     int getUniqueObstacleID();
     int currentObstacleID = 0;
 
+    // simulation
+    inline double evaluateSpeedOfSound(SPHParticle *sp);
+    inline double evaluateSpeedOfSoundSquared(SPHParticle *sp);
     void updateFluidConstants();
+    void updateObstacleVelocity(double dt);
     void updateGrid();
     void updateNearestNeighbours();
     void updateFluidDensityAndPressure();

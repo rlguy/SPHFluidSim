@@ -101,9 +101,6 @@ public:
 protected:
     void initializeGL();
     void resizeGL(int width, int height);
-    void mousePressEvent(QMouseEvent *event);
-    void mouseReleaseEvent(QMouseEvent *event);
-    void mouseMoveEvent(QMouseEvent *event);
 
 public slots:
     void paintGL();
@@ -155,6 +152,7 @@ private:
     int currentFrame;
     float simulationFPS = 30.0;
     bool isSimulationPaused = false;
+    bool isSimulationDrawn = true;
 
     // billboard test
     GLuint texture[1];

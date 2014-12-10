@@ -6,7 +6,7 @@ settings = {
   ratioOfSpecificHeats             = 1.0,
   pressureCoefficient              = 20.0,
   initialDensity                   = 20.0,
-  viscosityCoefficient             = 0.03,
+  viscosityCoefficient             = 0.018,
   particleMass                     = 1.0,
   maximumVelocity                  = 75.0,
   maximumAcceleration              = 75.0,
@@ -28,28 +28,29 @@ settings = {
   isHiddenBoundaryParticlesEnabled = true,
 
   -- config for setting up simulation
-  logfile                        = "file1.txt",
-  fps                            = 30,
+  logfile                        = "dambreak164406.txt",
+  fps                            = 120,
   smoothingRadius                = 0.2,
-  numParticles                   = 1000,
+  numParticles                   = 120000,
   initialDampingConstant         = 2.0,
   finalDampingConstant           = 0.0,
   isRenderingEnabled             = true,
   isSimulationPaused             = false,
+  isSimulationDrawn              = true,
   
   initialBounds                  = {minx = 0.0,
-                                    maxx = 3.0,
+                                    maxx = 14.0,
                                     miny = 0.0,
                                     maxy = 8.0,
                                     minz = 0.0,
-                                    maxz = 2.0},
+                                    maxz = 6.0},
                                     
   finalBounds                    = {minx = 0.0,
-                                    maxx = 8.0,
+                                    maxx = 14.0,
                                     miny = 0.0,
                                     maxy = 8.0,
                                     minz = 0.0,
-                                    maxz = 2.0}
+                                    maxz = 6.0}
     
 }
 

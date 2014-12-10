@@ -198,7 +198,7 @@ void GLWidget::initializeSimulation() {
     double maxy = bounds["maxy"].cast<double>();
     double minz = bounds["minz"].cast<double>();
     double maxz = bounds["maxz"].cast<double>();
-    double rx = 1.0;
+    double rx = 0.3;
     double ry = 0.8;
     double rz = 1.0;
 
@@ -214,17 +214,50 @@ void GLWidget::initializeSimulation() {
     }
     fluidSim.addFluidParticles(points);
 
-    points = utils::createPointPanel(2, 8, 0.7*radius, 3,
-                                     glm::vec3(0.0, 0.0, 1.0), glm::vec3(0.0, 1.0, 0.0), true);
-    //fluidSim.addObstacleParticles(points);
-    fluidSim.translateObstacle(0, glm::vec3(maxx, 0.5*(maxy-miny), 0.5*(maxz-minz)));
-
     double damp = t["initialDampingConstant"].cast<double>();
     fluidSim.setDampingConstant(damp);
 
     fluidGradient = Gradients::getSkyblueGradient();
     minColorDensity = t["minColorDensity"].cast<double>();
     maxColorDensity = t["maxColorDensity"].cast<double>();
+
+    // create obstacles
+    float widthPad = 0.2;
+    float heightPad = 0.4;
+    float width = (maxz - minz) / 3 + widthPad;
+    float height = (maxy - miny) + heightPad;
+    float depth = 4.2;
+    float r = 0.6*radius;
+    int layers = 6;
+    bool isStaggered = true;
+
+    glm::vec3 p1 = glm::vec3(depth, height/2, ((maxz-minz) / 3)-((maxz-minz)/6));
+    glm::vec3 p2 = glm::vec3(depth, height/2, (2*(maxz-minz) / 3)-((maxz-minz)/6));
+    glm::vec3 p3 = glm::vec3(depth, height/2, (3*(maxz-minz) / 3)-((maxz-minz)/6));
+
+    std::vector<glm::vec3> o1, o2, o3;
+    o1 = utils::createPointPanel(width, height, r, layers,
+                                 glm::vec3(0.0,0.0,1.0), glm::vec3(0.0, 1.0, 0.0),
+                                 isStaggered);
+    o2 = utils::createPointPanel(width, height+1.0, r, layers,
+                                 glm::vec3(0.0,0.0,1.0), glm::vec3(0.0, 1.0, 0.0),
+                                 isStaggered);
+    o3 = utils::createPointPanel(width, height, r, layers,
+                                 glm::vec3(0.0,0.0,1.0), glm::vec3(0.0, 1.0, 0.0),
+                                 isStaggered);
+
+    o1 = utils::translatePoints(o1, p1);
+    //o2 = utils::translatePoints(o2, p2);
+    o3 = utils::translatePoints(o3, p3);
+
+    int id1 = fluidSim.addObstacleParticles(o1);
+    int id2 = fluidSim.addObstacleParticles(o2);
+    int id3 = fluidSim.addObstacleParticles(o3);
+    //fluidSim.translateObstacle(id1, p1);
+    fluidSim.translateObstacle(id2, p2);
+    //fluidSim.translateObstacle(id3, p3);
+
+
 }
 
 void GLWidget::activateSimulation() {
@@ -271,9 +304,11 @@ void GLWidget::updateSimulationSettings() {
     maxColorDensity = t["maxColorDensity"].cast<double>();
     simulationFPS = t["fps"].cast<double>();
     isSimulationPaused = t["isSimulationPaused"].cast<bool>();
+    isSimulationDrawn = t["isSimulationDrawn"].cast<bool>();
 }
 
 void GLWidget::updateSimulation() {
+
     // find delta time
     float dt = (float) deltaTimer->elapsed() / 1000;
     deltaTimer->restart();
@@ -302,7 +337,10 @@ void GLWidget::updateSimulation() {
     bool isRenderingEnabled = t["isRenderingEnabled"].cast<bool>();
 
     if (!isSimulationPaused) {
-        fluidSim.rotateObstacle(0, Quaternion(glm::vec3(0.0, 1.0, 0.0), 0.05));
+        if (isRendering) {
+            float speed = -1.33;
+            fluidSim.translateObstacle(1, glm::vec3(0.0, speed*dt, 0.0));
+        }
         fluidSim.update(dt);
     }
 
@@ -350,12 +388,6 @@ void GLWidget::writeFrame() {
     currentFrame += 1;
 }
 
-
-// drawn when animation is running
-void GLWidget::drawAnimation() {
-
-}
-
 bool GLWidget::saveFrameToFile(QString fileName) {
     GLubyte *data = (GLubyte*)malloc(4*(int)screenWidth*(int)screenHeight);
     if( data ) {
@@ -387,7 +419,7 @@ bool GLWidget::saveFrameToFile(QString fileName) {
 void GLWidget::paintGL()
 {
     camera.set();
-    utils::drawGrid();
+    //utils::drawGrid();
 
     float scale = 2.0;
     glm::mat4 scaleMat = glm::transpose(glm::mat4(scale, 0.0, 0.0, 0.0,
@@ -396,7 +428,12 @@ void GLWidget::paintGL()
                                                   0.0, 0.0, 0.0, 1.0));
     glPushMatrix();
     glMultMatrixf((GLfloat*)&scaleMat);
-    fluidSim.draw();
+
+    if (isSimulationDrawn) {
+        fluidSim.draw();
+    } else {
+        fluidSim.drawBounds();
+    }
 
     glColor3f(0.0, 0.0, 0.0);
     glPointSize(6.0);
@@ -466,20 +503,6 @@ void GLWidget::keyReleaseEvent(QKeyEvent *event)
 
 }
 
-void GLWidget::mousePressEvent(QMouseEvent *event)
-{
-    (void)event;
-}
-
-void GLWidget::mouseReleaseEvent(QMouseEvent *event)
-{
-    (void)event;
-}
-
-void GLWidget::mouseMoveEvent(QMouseEvent *event)
-{
-    (void)event;
-}
 
 
 

@@ -31,6 +31,7 @@ public:
     SPHFluidSimulation(double smoothingRadius);
     void update(float dt);
     void draw();
+    void drawBounds();
 
     // user functions
     void addFluidParticles(std::vector<glm::vec3> points);
@@ -114,13 +115,14 @@ private:
     double pressureCoefficient;
     double particleMass;
     bool isMotionDampingEnabled = false;
+    bool displayConsoleOutput = false;
     double motionDampingCoefficient;
     double boundaryDampingCoefficient;
     double ratioOfSpecificHeats;
     double viscosityCoefficient;
     double maximumVelocity;
     double maximumAcceleration;
-    bool displaySimulationConsoleOutput;
+
 
     // kernel constants
     double poly6Coefficient;

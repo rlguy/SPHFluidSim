@@ -45,7 +45,7 @@ void SPHFluidSimulation::initSimulationConstants() {
     isMotionDampingEnabled           = t["isMotionDampingEnabled"].cast<bool>();
     isBoundaryParticlesEnabled       = t["isBoundaryParticlesEnabled"].cast<bool>();
     isHiddenBoundaryParticlesEnabled = t["isHiddenBoundaryParticlesEnabled"].cast<bool>();
-    displaySimulationConsoleOutput   = t["displaySimulationConsoleOutput"].cast<bool>();
+    displayConsoleOutput             = t["displaySimulationConsoleOutput"].cast<bool>();
 
     // graphics
     minColorDensity                = t["minColorDensity"].cast<double>();
@@ -184,6 +184,7 @@ void SPHFluidSimulation::setObstaclePosition(int id, glm::vec3 pos) {
     if (obstaclesByID.find(id) == obstaclesByID.end()) {
         return;
     }
+
     SPHObstacle *o = obstaclesByID[id];
     translateObstacle(id, pos - o->position);
 }
@@ -866,19 +867,23 @@ void SPHFluidSimulation::update(float dt) {
     simulationTime = simulationTimer.getTime();
     graphicsUpdateTime = graphicsTimer.getTime();
 
-    /*
-    using namespace luabridge;
-    lua_State* L = luaL_newstate();
-    luaL_openlibs(L);
-
-    if (luaL_dofile(L, "scripts/fluid_config.lua") != 0) {
-        qDebug() << "Error loading script";
-        exit(1);
+    double total = neighbourSearchTime + simulationTime;
+    if (displayConsoleOutput) {
+        qDebug() << "total: " << QString::number(total)
+                    + " pct neighbour: " +
+                    QString::number((100*(neighbourSearchTime/total))) +
+                    " #particles: " + QString::number(allParticles.size());
     }
-    LuaRef t = getGlobal(L, "settings");
-    bool displayOutput = t["displaySimulationConsoleOutput"].cast<bool>();
-    */
 
+}
+
+void SPHFluidSimulation::drawBounds() {
+    double w = xmax - xmin;
+    double h = ymax - ymin;
+    double d = zmax - zmin;
+    glColor3f(0.0, 0.0, 0.0);
+    utils::drawWireframeCube(glm::vec3(xmin + w/2, ymin + h/2, zmin + d/2),
+                             w, h, d);
 }
 
 void SPHFluidSimulation::draw() {
@@ -908,11 +913,7 @@ void SPHFluidSimulation::draw() {
         }
     }
 
-    double w = xmax - xmin;
-    double h = ymax - ymin;
-    double d = zmax - zmin;
-    glColor3f(0.0, 0.0, 0.0);
-    utils::drawWireframeCube(glm::vec3(w/2, h/2, d/2), w, h, d);
+    drawBounds();
 
     drawTimer.stop();
     graphicsDrawTime = drawTimer.getTime();

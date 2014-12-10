@@ -14,6 +14,9 @@ SPHFluidSimulation::SPHFluidSimulation(double smoothingRadius)
     initSimulationConstants();
     initKernelConstants();
     initializeBoundaryParticles();
+
+    cameraPosition = glm::vec3(0.0, 0.0, 0.0);
+    fluidGradient = Gradients::getSkyblueGradient();
 }
 
 void SPHFluidSimulation::initSimulationConstants() {
@@ -42,6 +45,12 @@ void SPHFluidSimulation::initSimulationConstants() {
     isMotionDampingEnabled         = t["isMotionDampingEnabled"].cast<bool>();
     isBoundaryParticlesEnabled     = t["isBoundaryParticlesEnabled"].cast<bool>();
     displaySimulationConsoleOutput = t["displaySimulationConsoleOutput"].cast<bool>();
+
+    minColorDensity                = t["minColorDensity"].cast<double>();
+    maxColorDensity                = t["maxColorDensity"].cast<double>();
+    maxColorVelocity               = t["maxColorVelocity"].cast<double>();
+    maxColorAcceleration           = t["maxColorAcceleration"].cast<double>();
+    colorArrivalRadius             = t["colorArrivalRadius"].cast<double>();
 
     gravityForce = glm::vec3(0.0, -gravityMagnitude, 0.0);
 }
@@ -73,12 +82,20 @@ void SPHFluidSimulation::setDampingConstant(double c) {
     motionDampingCoefficient = c;
 }
 
+void SPHFluidSimulation::setCameraPosition(glm::vec3 pos) {
+    cameraPosition = pos;
+}
+
 std::vector<SPHParticle*> SPHFluidSimulation::getFluidParticles() {
     return fluidParticles;
 }
 
 std::vector<SPHParticle*> SPHFluidSimulation::getObstacleParticles() {
     return obstacleParticles;
+}
+
+std::vector<SPHParticle*> SPHFluidSimulation::getAllParticles() {
+    return allParticles;
 }
 
 float SPHFluidSimulation::getParticleSize() {
@@ -284,6 +301,10 @@ SPHParticle* SPHFluidSimulation::createSPHParticle(glm::vec3 pos, glm::vec3 velo
 
     // initial pressure will be calculated once all particles are in place
     s->pressure = 0.0;
+
+    // graphics
+    s->color = glm::vec3(1.0, 1.0, 1.0);
+    s->colorDensity = s->density;
 
     return s;
 }
@@ -632,6 +653,108 @@ glm::vec3 SPHFluidSimulation::calculateBoundaryAcceleration(SPHParticle *sp) {
     return acceleration;
 }
 
+void SPHFluidSimulation::updateZSortingDistance() {
+    glm::vec3 r;
+    for (uint i=0; i<allParticles.size(); i++) {
+        r = cameraPosition - allParticles[i]->position;
+        allParticles[i]->zdistance = glm::dot(r, r);
+    }
+}
+
+void SPHFluidSimulation::updateFluidColor(double dt) {
+    SPHParticle *sp;
+    int idxOffset = 50;
+    int maxIdx = fluidGradient.size() - 1;
+    int minIdx = fmin(0 + idxOffset, maxIdx);
+    double minD = minColorDensity;
+    double maxD = maxColorDensity;
+    double invDiff = 1/(maxD - minD);
+    glm::vec3 targetColor;
+    std::array<double, 3> cmin;
+    std::array<double, 3> cmax;
+    glm::vec3 cVect;
+
+    if (dt == 0) {
+        return;
+    }
+    double invDt = 1/dt;
+
+
+    // find target color index in gradient. Move color to target based upon
+    // smoothed particle density. Lerp between color indices.
+    // Particle density is smoothed by keeping track of acceleration and velocity
+    // of smoothed value changes
+    for (uint i=0; i<fluidParticles.size(); i++) {
+        sp = fluidParticles[i];
+
+        // update color density
+        // find color density target
+        double targetDensity = sp->density;
+        double currentDensity = sp->colorDensity;
+        double desired = targetDensity - currentDensity;
+        if (fabs(desired) < colorArrivalRadius) {
+            double r = fabs(desired) / colorArrivalRadius;
+            double newMag = utils::lerp(0, maxColorVelocity, r);
+            if (desired > 0) {
+                desired = newMag;
+            } else {
+                desired = -newMag;
+            }
+        } else {
+            if (desired > 0) {
+                desired = maxColorVelocity;
+            } else {
+                desired = -maxColorVelocity;
+            }
+        }
+
+        // color density acceleration
+        double acc = desired - sp->colorVelocity;
+        if (fabs(acc) > maxColorAcceleration) {
+            if (acc > 0) {
+                acc = maxColorAcceleration;
+            } else {
+                acc = -maxColorAcceleration;
+            }
+        }
+
+        // update color density velocity and position
+        sp->colorVelocity += acc*dt;
+        sp->colorDensity += sp->colorVelocity*dt;
+        sp->colorDensity = fmax(0.0, sp->colorDensity);
+
+        // update color based upon color density
+        double d = sp->colorDensity;
+        double r = 1 - (d - minD) * invDiff;
+        r = fmax(0.0, r);
+        r = fmin(1.0, r);
+
+        // find target color
+        double lerpVal = utils::lerp(minIdx, maxIdx, r);
+        int minCIdx = floor(lerpVal);
+        int maxCIdx = ceil(lerpVal);
+        if (minCIdx == maxCIdx) {
+            cmin = fluidGradient[minCIdx];
+            targetColor = glm::vec3(cmin[0], cmin[1], cmin[2]);
+        } else {
+            cmin = fluidGradient[minCIdx];
+            cmax = fluidGradient[maxCIdx];
+            double f = lerpVal - minCIdx;
+
+            targetColor = glm::vec3(utils::lerp(cmin[0], cmax[0], f),
+                                    utils::lerp(cmin[1], cmax[1], f),
+                                    utils::lerp(cmin[2], cmax[2], f));
+        }
+        sp->color = targetColor;
+
+    }
+}
+
+void SPHFluidSimulation::updateGraphics(double dt) {
+    updateZSortingDistance();
+    updateFluidColor(dt);
+}
+
 void SPHFluidSimulation::update(float dt) {
     updateFluidConstants();
     removeSPHParticlesMarkedForRemoval();
@@ -663,7 +786,7 @@ void SPHFluidSimulation::update(float dt) {
         updateFluidPosition((double)timeStep);
         updateObstacleVelocity((double)timeStep);
     }
-    //qDebug() << numSteps;
+    updateGraphics(dt);
     t1.stop();
 
     using namespace luabridge;

@@ -56,6 +56,7 @@
 #include <QtOpenGL>
 #include <QCursor>
 #include <GL/glu.h>
+#include <algorithm>
 #include "glwidget.h"
 #include "glm/glm.hpp"
 #include "quaternion.h"
@@ -70,12 +71,11 @@ GLWidget::GLWidget(QWidget *parent)
     : QGLWidget(QGLFormat(QGL::SampleBuffers), parent)
 {
 
-    screenWidth = 1200;
-    screenHeight = 600;
+    screenWidth = 1280;
+    screenHeight = 720;
 
-    //initializealize update/draw timers
+    // update timer
     float updatesPerSecond = 60;
-
     updateTimer = new QTimer(this);
     connect(updateTimer, SIGNAL(timeout()), this, SLOT(updateSimulation()));
     updateTimer->start(1000.0/updatesPerSecond);
@@ -112,73 +112,6 @@ GLWidget::GLWidget(QWidget *parent)
 
     initializeSimulation();
 
-    /*
-    float pad = 1.05*radius;
-    float stagger = 0.1*radius;
-    glm::vec3 r = glm::vec3(0.1, 0.1, 0.1);
-    for (int k=0; k<nz; k++) {
-        for (int j=0; j<ny; j++) {
-            for (int i=0; i<nx; i++) {
-                float sx = (2*((float)rand()/RAND_MAX)-1)*stagger;
-                float sy = (2*((float)rand()/RAND_MAX)-1)*stagger;
-                float sz = (2*((float)rand()/RAND_MAX)-1)*stagger;
-
-                glm::vec3 p;
-                p = r + glm::vec3(i*pad+sx, j*pad+sy, k*pad+sz);
-                points.push_back(p);
-            }
-        }
-    }
-
-    */
-
-
-    /*
-    nx = 100;
-    ny = 30;
-    nz = 8;
-    pad = 0.6*radius;
-    std::vector<glm::vec3> obstaclePoints;
-    r = glm::vec3(0.0, -0.1, 3.0);
-    for (int k=0; k<nz; k++) {
-        for (int j=0; j<ny; j++) {
-            for (int i=0; i<nx; i++) {
-                glm::vec3 p;
-                p = r + glm::vec3(i*pad, j*pad, k*pad);
-                obstaclePoints.push_back(p);
-                p = r + glm::vec3(i*pad + 0.5*pad, j*pad + 0.5*pad, k*pad + 0.5*pad);
-                obstaclePoints.push_back(p);
-
-                p = r + glm::vec3(i*pad, j*pad, k*pad -3.0);
-                obstaclePoints.push_back(p);
-                p = r + glm::vec3(i*pad + 0.5*pad, j*pad + 0.5*pad, k*pad + 0.5*pad-3.0);
-                obstaclePoints.push_back(p);
-            }
-        }
-    }
-
-    nx = 8;
-    ny = 30;
-    nz = 70;
-    r = glm::vec3(0.0, -0.1, 0.3);
-    for (int k=0; k<nz; k++) {
-        for (int j=0; j<ny; j++) {
-            for (int i=0; i<nx; i++) {
-                glm::vec3 p;
-                p = r + glm::vec3(i*pad, j*pad, k*pad);
-                obstaclePoints.push_back(p);
-                p = r + glm::vec3(i*pad + 0.5*pad, j*pad + 0.5*pad, k*pad + 0.5*pad);
-                obstaclePoints.push_back(p);
-
-                p = r + glm::vec3(i*pad+4.0, j*pad, k*pad);
-                obstaclePoints.push_back(p);
-                p = r + glm::vec3(i*pad + 0.5*pad + 4.0, j*pad + 0.5*pad, k*pad + 0.5*pad);
-                obstaclePoints.push_back(p);
-            }
-        }
-    }
-    int id = fluidSim.addObstacleParticles(obstaclePoints);
-    */
 }
 
 GLWidget::~GLWidget()
@@ -250,6 +183,10 @@ void GLWidget::initializeSimulation() {
     }
     LuaRef t = getGlobal(L, "settings");
 
+    simulationFPS = t["fps"].cast<double>();
+    isSimulationPaused = t["isSimulationPaused"].cast<bool>();
+
+
     double radius = t["smoothingRadius"].cast<double>();
     fluidSim = SPHFluidSimulation(radius);
 
@@ -276,11 +213,17 @@ void GLWidget::initializeSimulation() {
     }
     fluidSim.addFluidParticles(points);
 
+    points = utils::createPointPanel(2, 8, 0.7*radius, 3,
+                                     glm::vec3(0.0, 0.0, 1.0), glm::vec3(0.0, 1.0, 0.0), true);
+    //fluidSim.addObstacleParticles(points);
+    fluidSim.translateObstacle(0, glm::vec3(maxx, 0.5*(maxy-miny), 0.5*(maxz-minz)));
+
     double damp = t["initialDampingConstant"].cast<double>();
     fluidSim.setDampingConstant(damp);
 
     fluidGradient = Gradients::getSkyblueGradient();
-    minColorDensity = fluidSim.getInitialDensity();
+    minColorDensity = t["minColorDensity"].cast<double>();
+    maxColorDensity = t["maxColorDensity"].cast<double>();
 }
 
 void GLWidget::activateSimulation() {
@@ -311,18 +254,7 @@ void GLWidget::activateSimulation() {
 void GLWidget::stopSimulation() {
 }
 
-void GLWidget::updateSimulation() {
-    // find delta time
-    float dt = (float) deltaTimer->elapsed() / 1000;
-    runningTime = runningTime + dt;
-    deltaTimer->restart();
-    updateCameraMovement(dt);
-
-    dt *= deltaTimeModifier;  // speed of simulation
-
-    dt = 1.0/60.0;
-
-    // fluidSimulation
+void GLWidget::updateSimulationSettings() {
     using namespace luabridge;
 
     lua_State* L = luaL_newstate();
@@ -333,10 +265,48 @@ void GLWidget::updateSimulation() {
         exit(1);
     }
     LuaRef t = getGlobal(L, "settings");
+
+    minColorDensity = t["minColorDensity"].cast<double>();
+    maxColorDensity = t["maxColorDensity"].cast<double>();
+    simulationFPS = t["fps"].cast<double>();
+    isSimulationPaused = t["isSimulationPaused"].cast<bool>();
+}
+
+void GLWidget::updateSimulation() {
+    // find delta time
+    float dt = (float) deltaTimer->elapsed() / 1000;
+    deltaTimer->restart();
+    updateCameraMovement(dt);
+    fluidSim.setCameraPosition(camera.position);
+
+    dt = 1.0 / simulationFPS;
+    if (isSimulationPaused) {
+        dt = 0.0;
+    }
+    runningTime = runningTime + dt;
+
+
+    // fluidSimulation
+    using namespace luabridge;
+
+    updateSimulationSettings();
+    lua_State* L = luaL_newstate();
+    luaL_openlibs(L);
+
+    if (luaL_dofile(L, "scripts/fluid_config.lua") != 0) {
+        qDebug() << "Error loading script";
+        exit(1);
+    }
+    LuaRef t = getGlobal(L, "settings");
     bool isRenderingEnabled = t["isRenderingEnabled"].cast<bool>();
 
-    fluidSim.update(dt);
-    if (isRendering && isRenderingEnabled) {
+    if (!isSimulationPaused) {
+        fluidSim.rotateObstacle(0, Quaternion(glm::vec3(0.0, 1.0, 0.0), 0.05));
+        fluidSim.update(dt);
+    }
+
+
+    if (isRendering && isRenderingEnabled && !isSimulationPaused) {
         writeFrame();
     } else {
         updateGL();
@@ -418,6 +388,10 @@ void GLWidget::drawBillboard(GLuint *tex, glm::vec3 p, float width) {
     glPopMatrix();
 }
 
+bool compareByZDistance(const SPHParticle *p1, const SPHParticle *p2) {
+    return p1->zdistance > p2->zdistance;
+}
+
 void GLWidget::paintGL()
 {
     camera.set();
@@ -433,22 +407,39 @@ void GLWidget::paintGL()
     fluidSim.draw();
 
     // draw fluid particles. Color by density value.
-    std::vector<SPHParticle*> particles = fluidSim.getFluidParticles();
+    std::vector<SPHParticle*> particles = fluidSim.getAllParticles();
+    std::sort(particles.begin(), particles.end(), compareByZDistance);
+
+    SPHParticle *sp;
     float size = 0.5*fluidSim.getParticleSize();
     for (uint i=0; i<particles.size(); i++) {
+        sp = particles[i];
         glm::vec3 p = particles[i]->position;
-        double density = particles[i]->density;
-        double t = (density - minColorDensity) / (maxColorDensity - minColorDensity);
-        t = fmax(0.0, t);
-        t = fmin(1.0, t);
-        int cidx = floor(utils::lerp(50.0, fluidGradient.size()-1, 1-t));
 
-        glColor3f(fluidGradient[cidx][0],
-                  fluidGradient[cidx][1],
-                  fluidGradient[cidx][2]);
-        drawBillboard(&texture[0], p, size);
+        if (particles[i]->isObstacle) {
+            glColor3f(0.5, 0.5, 0.5);
+        } else {
+            glColor3f(sp->color.x, sp->color.y, sp->color.z);
+        }
 
+        if (particles[i]->isVisible) {
+            drawBillboard(&texture[0], p, size);
+        }
     }
+
+    // draw obstacle particles
+    particles = fluidSim.getObstacleParticles();
+    glColor3f(0.5, 0.5, 0.5);
+    for (uint i=0; i<particles.size(); i++) {
+        if (particles[i]->isVisible) {
+            glm::vec3 p = particles[i]->position;
+            drawBillboard(&texture[0], p, size);
+        }
+    }
+
+    glColor3f(0.0, 0.0, 0.0);
+    glPointSize(6.0);
+
     glPopMatrix();
 
 

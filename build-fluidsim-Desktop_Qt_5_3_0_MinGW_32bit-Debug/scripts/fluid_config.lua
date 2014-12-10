@@ -1,3 +1,5 @@
+-- note: color velocity, fading stuck boundary particles, z sorting
+
 settings = {
 
   -- constants within sphfluidsimulation
@@ -6,23 +8,28 @@ settings = {
   initialDensity                 = 20.0,
   viscosityCoefficient           = 0.03,
   particleMass                   = 1.0,
-  maximumVelocity                = 100.0,
-  maximumAcceleration            = 100.0,
+  maximumVelocity                = 75.0,
+  maximumAcceleration            = 75.0,
   motionDampingCoefficient       = 0.0,
   boundaryDampingCoefficient     = 0.2,
   gravityMagnitude               = 9.8,
   isMotionDampingEnabled         = true,
   isBoundaryParticlesEnabled     = false,
-  displaySimulationConsoleOutput = true,
+  displaySimulationConsoleOutput = false,
+  
+  -- graphics
+  minColorDensity                = 0.0,
+  maxColorDensity                = 100,
+  maxColorVelocity               = 100.0,
+  maxColorAcceleration           = 100.0,
+  colorArrivalRadius             = 0.1,
 
   -- config for setting up simulation
   fps                            = 30,
   smoothingRadius                = 0.2,
-  numParticles                   = 16000,
+  numParticles                   = 5000,
   initialDampingConstant         = 8.0,
   finalDampingConstant           = 0.0,
-  minColorDensity                = 0.0,
-  maxColorDensity                = 100,
   isRenderingEnabled             = true,
   isSimulationPaused             = false,
   

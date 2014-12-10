@@ -117,9 +117,11 @@ private:
     void updateCameraMovement(float dt);
     void drawGrid();
     void drawAnimation();
+    //bool compareByZDistance(const SPHParticle &p1, const SPHParticle &p2);
     void drawBillboard(GLuint *tex, glm::vec3 p, float width);
     void initializeSimulation();
     void activateSimulation();
+    void updateSimulationSettings();
     void stopSimulation();
     void writeFrame();
     bool saveFrameToFile(QString fileName);
@@ -151,6 +153,8 @@ private:
     float deltaTimeModifier;
     float runningTime;
     int currentFrame;
+    float simulationFPS = 30.0;
+    bool isSimulationPaused = false;
 
     // billboard test
     GLuint texture[1];

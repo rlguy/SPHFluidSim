@@ -25,6 +25,11 @@ struct SPHParticle {
     bool isObstacle;
     bool isMarkedForRemoval = false;
     bool isVisible = true;
+    double zdistance = 0.0;
+
+    glm::vec3 color;
+    double colorDensity;
+    double colorVelocity = 0.0;
 };
 
 

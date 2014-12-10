@@ -13,6 +13,7 @@
 #include "sphobstacle.h"
 #include "stopwatch.h"
 #include "quaternion.h"
+#include "gradients.h"
 
 extern "C" {
 # include "lua/lua.h"
@@ -41,8 +42,10 @@ public:
     void setDampingConstant(double c);
     std::vector<SPHParticle*> getFluidParticles();
     std::vector<SPHParticle*> getObstacleParticles();
+    std::vector<SPHParticle*> getAllParticles();
     float getParticleSize();
     float getInitialDensity();
+    void setCameraPosition(glm::vec3 pos);    // used for zsorting
 
     void setObstaclePosition(int id, glm::vec3 pos);
     void translateObstacle(int id, glm::vec3 trans);
@@ -76,6 +79,17 @@ private:
     void enforceFluidParticlePositionBounds(SPHParticle *p);
     bool isEnforcingFluidParticlePositionBoundsThisTimeStep = false;
     double calculateTimeStep();
+
+    // graphics
+    void updateGraphics(double dt);
+    void updateZSortingDistance();
+    void updateFluidColor(double dt);
+    std::vector<std::array<double, 3>> fluidGradient;
+    double maxColorVelocity = 1.0;
+    double maxColorAcceleration = 1.0;
+    double minColorDensity = 0.0;
+    double maxColorDensity = 100.0;
+    double colorArrivalRadius = 0.5;
 
     // simulation constants
     double h;                              // smoothing radius
@@ -123,6 +137,7 @@ private:
     std::unordered_map<int,SPHParticle*> particlesByGridID;
     std::unordered_map<int,SPHObstacle*> obstaclesByID;
     bool isSPHParticleRemoved = false;
+    glm::vec3 cameraPosition;
 };
 
 #endif // SPHFLUIDSIMULATION_H

@@ -32,25 +32,29 @@ void SPHFluidSimulation::initSimulationConstants() {
     LuaRef t = getGlobal(L, "settings");
 
     hsq = h*h;
-    ratioOfSpecificHeats           = t["ratioOfSpecificHeats"].cast<double>();
-    pressureCoefficient            = t["pressureCoefficient"].cast<double>();
-    initialDensity                 = t["initialDensity"].cast<double>();
-    viscosityCoefficient           = t["viscosityCoefficient"].cast<double>();
-    particleMass                   = t["particleMass"].cast<double>();
-    maximumVelocity                = t["maximumVelocity"].cast<double>();
-    maximumAcceleration            = t["maximumAcceleration"].cast<double>();
-    motionDampingCoefficient       = t["motionDampingCoefficient"].cast<double>();
-    boundaryDampingCoefficient     = t["boundaryDampingCoefficient"].cast<double>();
-    gravityMagnitude               = t["gravityMagnitude"].cast<double>();
-    isMotionDampingEnabled         = t["isMotionDampingEnabled"].cast<bool>();
-    isBoundaryParticlesEnabled     = t["isBoundaryParticlesEnabled"].cast<bool>();
-    displaySimulationConsoleOutput = t["displaySimulationConsoleOutput"].cast<bool>();
+    ratioOfSpecificHeats             = t["ratioOfSpecificHeats"].cast<double>();
+    pressureCoefficient              = t["pressureCoefficient"].cast<double>();
+    initialDensity                   = t["initialDensity"].cast<double>();
+    viscosityCoefficient             = t["viscosityCoefficient"].cast<double>();
+    particleMass                     = t["particleMass"].cast<double>();
+    maximumVelocity                  = t["maximumVelocity"].cast<double>();
+    maximumAcceleration              = t["maximumAcceleration"].cast<double>();
+    motionDampingCoefficient         = t["motionDampingCoefficient"].cast<double>();
+    boundaryDampingCoefficient       = t["boundaryDampingCoefficient"].cast<double>();
+    gravityMagnitude                 = t["gravityMagnitude"].cast<double>();
+    isMotionDampingEnabled           = t["isMotionDampingEnabled"].cast<bool>();
+    isBoundaryParticlesEnabled       = t["isBoundaryParticlesEnabled"].cast<bool>();
+    isHiddenBoundaryParticlesEnabled = t["isHiddenBoundaryParticlesEnabled"].cast<bool>();
+    displaySimulationConsoleOutput   = t["displaySimulationConsoleOutput"].cast<bool>();
 
+    // graphics
     minColorDensity                = t["minColorDensity"].cast<double>();
     maxColorDensity                = t["maxColorDensity"].cast<double>();
     maxColorVelocity               = t["maxColorVelocity"].cast<double>();
     maxColorAcceleration           = t["maxColorAcceleration"].cast<double>();
     colorArrivalRadius             = t["colorArrivalRadius"].cast<double>();
+    stuckToBoundaryRadius          = t["stuckToBoundaryRadius"].cast<double>();
+    stuckToBoundaryAlphaVelocity   = t["stuckToBoundaryAlphaVelocity"].cast<double>();
 
     gravityForce = glm::vec3(0.0, -gravityMagnitude, 0.0);
 }
@@ -82,8 +86,27 @@ void SPHFluidSimulation::setDampingConstant(double c) {
     motionDampingCoefficient = c;
 }
 
-void SPHFluidSimulation::setCameraPosition(glm::vec3 pos) {
-    cameraPosition = pos;
+void SPHFluidSimulation::setTexture(GLuint *tex) {
+    texture = tex;
+    isTextureInitialized = true;
+}
+
+void SPHFluidSimulation::setCamera(camera3d *cam) {
+    camera = cam;
+    isCameraInitialized = true;
+}
+
+QString SPHFluidSimulation::getTimingData() {
+    double total = neighbourSearchTime + simulationTime +
+                   graphicsUpdateTime + graphicsDrawTime;
+
+    QString str = QString::number(total) + " " +
+                  QString::number(neighbourSearchTime) + " " +
+                  QString::number(simulationTime) + " " +
+                  QString::number(graphicsUpdateTime) + " " +
+                  QString::number(graphicsDrawTime);
+
+    return str;
 }
 
 std::vector<SPHParticle*> SPHFluidSimulation::getFluidParticles() {
@@ -654,15 +677,71 @@ glm::vec3 SPHFluidSimulation::calculateBoundaryAcceleration(SPHParticle *sp) {
 }
 
 void SPHFluidSimulation::updateZSortingDistance() {
+    if (!isCameraInitialized || !isTextureInitialized) {
+        return;
+    }
+
     glm::vec3 r;
+    glm::vec3 cpos = camera->position;
     for (uint i=0; i<allParticles.size(); i++) {
-        r = cameraPosition - allParticles[i]->position;
+        r = cpos - allParticles[i]->position;
         allParticles[i]->zdistance = glm::dot(r, r);
     }
 }
 
-void SPHFluidSimulation::updateFluidColor(double dt) {
-    SPHParticle *sp;
+bool SPHFluidSimulation::isFluidParticleStuckToBoundary(SPHParticle *sp) {
+    double r = stuckToBoundaryRadius;
+    bool isStuck = false;
+    glm::vec3 p = sp->position;
+
+    if (p.x < xmin + r || p.x > xmax - r ||
+        p.y < ymin + r || p.y > ymax - r ||
+        p.z < zmin + r || p.z > zmax - r) {
+        isStuck = true;
+    }
+
+    return isStuck;
+}
+
+void SPHFluidSimulation::updateFluidParticleColorDensity(double dt, SPHParticle *sp) {
+    // update color density
+    // find color density target
+    double targetDensity = sp->density;
+    double currentDensity = sp->colorDensity;
+    double desired = targetDensity - currentDensity;
+    if (fabs(desired) < colorArrivalRadius) {
+        double r = fabs(desired) / colorArrivalRadius;
+        double newMag = utils::lerp(0, maxColorVelocity, r);
+        if (desired > 0) {
+            desired = newMag;
+        } else {
+            desired = -newMag;
+        }
+    } else {
+        if (desired > 0) {
+            desired = maxColorVelocity;
+        } else {
+            desired = -maxColorVelocity;
+        }
+    }
+
+    // color density acceleration
+    double acc = desired - sp->colorVelocity;
+    if (fabs(acc) > maxColorAcceleration) {
+        if (acc > 0) {
+            acc = maxColorAcceleration;
+        } else {
+            acc = -maxColorAcceleration;
+        }
+    }
+
+    // update color density velocity and position from acceleration
+    sp->colorVelocity += acc*dt;
+    sp->colorDensity += sp->colorVelocity*dt;
+    sp->colorDensity = fmax(0.0, sp->colorDensity);
+}
+
+glm::vec3 SPHFluidSimulation::calculateFluidParticleColor(SPHParticle *sp) {
     int idxOffset = 50;
     int maxIdx = fluidGradient.size() - 1;
     int minIdx = fmin(0 + idxOffset, maxIdx);
@@ -672,105 +751,97 @@ void SPHFluidSimulation::updateFluidColor(double dt) {
     glm::vec3 targetColor;
     std::array<double, 3> cmin;
     std::array<double, 3> cmax;
-    glm::vec3 cVect;
 
-    if (dt == 0) {
-        return;
+    // update color based upon color density
+    double d = sp->colorDensity;
+    double r = 1 - (d - minD) * invDiff;
+    r = fmax(0.0, r);
+    r = fmin(1.0, r);
+
+    // find target color
+    double lerpVal = utils::lerp(minIdx, maxIdx, r);
+    int minCIdx = floor(lerpVal);
+    int maxCIdx = ceil(lerpVal);
+    if (minCIdx == maxCIdx) {
+        cmin = fluidGradient[minCIdx];
+        targetColor = glm::vec3(cmin[0], cmin[1], cmin[2]);
+    } else {
+        cmin = fluidGradient[minCIdx];
+        cmax = fluidGradient[maxCIdx];
+        double f = lerpVal - minCIdx;
+
+        targetColor = glm::vec3(utils::lerp(cmin[0], cmax[0], f),
+                                utils::lerp(cmin[1], cmax[1], f),
+                                utils::lerp(cmin[2], cmax[2], f));
     }
-    double invDt = 1/dt;
 
+    return targetColor;
+}
 
-    // find target color index in gradient. Move color to target based upon
-    // smoothed particle density. Lerp between color indices.
+void SPHFluidSimulation::updateFluidParticleAlpha(double dt, SPHParticle *sp) {
+    sp->isStuckInBoundary = isFluidParticleStuckToBoundary(sp);
+
+    if (sp->isStuckInBoundary && sp->boundaryAlphaValue > 0.0) {
+        sp->boundaryAlphaValue -= stuckToBoundaryAlphaVelocity*dt;
+        sp->boundaryAlphaValue = fmax(0.0, sp->boundaryAlphaValue);
+        sp->alpha = utils::smoothstep(sp->boundaryAlphaValue);
+    } else if (!sp->isStuckInBoundary && sp->boundaryAlphaValue < 1.0) {
+        sp->boundaryAlphaValue += stuckToBoundaryAlphaVelocity*dt;
+        sp->boundaryAlphaValue = fmin(1.0, sp->boundaryAlphaValue);
+        sp->alpha = utils::smoothstep(sp->boundaryAlphaValue);
+    }
+}
+
+void SPHFluidSimulation::updateFluidColor(double dt) {
+    if (dt == 0) { return; }
+
+    SPHParticle *sp;
+
+    // find target color index in gradient. Lerp between color indices.
+    // Move color to target based upon smoothed value of particle density.
     // Particle density is smoothed by keeping track of acceleration and velocity
     // of smoothed value changes
     for (uint i=0; i<fluidParticles.size(); i++) {
         sp = fluidParticles[i];
 
-        // update color density
-        // find color density target
-        double targetDensity = sp->density;
-        double currentDensity = sp->colorDensity;
-        double desired = targetDensity - currentDensity;
-        if (fabs(desired) < colorArrivalRadius) {
-            double r = fabs(desired) / colorArrivalRadius;
-            double newMag = utils::lerp(0, maxColorVelocity, r);
-            if (desired > 0) {
-                desired = newMag;
-            } else {
-                desired = -newMag;
-            }
-        } else {
-            if (desired > 0) {
-                desired = maxColorVelocity;
-            } else {
-                desired = -maxColorVelocity;
-            }
-        }
+        updateFluidParticleColorDensity(dt, sp);
+        updateFluidParticleAlpha(dt, sp);
+        sp->color = calculateFluidParticleColor(sp);
 
-        // color density acceleration
-        double acc = desired - sp->colorVelocity;
-        if (fabs(acc) > maxColorAcceleration) {
-            if (acc > 0) {
-                acc = maxColorAcceleration;
-            } else {
-                acc = -maxColorAcceleration;
-            }
-        }
-
-        // update color density velocity and position
-        sp->colorVelocity += acc*dt;
-        sp->colorDensity += sp->colorVelocity*dt;
-        sp->colorDensity = fmax(0.0, sp->colorDensity);
-
-        // update color based upon color density
-        double d = sp->colorDensity;
-        double r = 1 - (d - minD) * invDiff;
-        r = fmax(0.0, r);
-        r = fmin(1.0, r);
-
-        // find target color
-        double lerpVal = utils::lerp(minIdx, maxIdx, r);
-        int minCIdx = floor(lerpVal);
-        int maxCIdx = ceil(lerpVal);
-        if (minCIdx == maxCIdx) {
-            cmin = fluidGradient[minCIdx];
-            targetColor = glm::vec3(cmin[0], cmin[1], cmin[2]);
-        } else {
-            cmin = fluidGradient[minCIdx];
-            cmax = fluidGradient[maxCIdx];
-            double f = lerpVal - minCIdx;
-
-            targetColor = glm::vec3(utils::lerp(cmin[0], cmax[0], f),
-                                    utils::lerp(cmin[1], cmax[1], f),
-                                    utils::lerp(cmin[2], cmax[2], f));
-        }
-        sp->color = targetColor;
+        // update fluid alpha.
 
     }
+}
+
+bool compareByZDistance(const SPHParticle *p1, const SPHParticle *p2) {
+    return p1->zdistance > p2->zdistance;
 }
 
 void SPHFluidSimulation::updateGraphics(double dt) {
     updateZSortingDistance();
     updateFluidColor(dt);
+
+    std::sort(allParticles.begin(), allParticles.end(), compareByZDistance);
 }
 
 void SPHFluidSimulation::update(float dt) {
     updateFluidConstants();
     removeSPHParticlesMarkedForRemoval();
 
-    StopWatch t1 = StopWatch();
-    StopWatch t2 = StopWatch();
-    t1.start();
+    StopWatch neighbourTimer = StopWatch();
+    StopWatch simulationTimer = StopWatch();
+    StopWatch graphicsTimer = StopWatch();
+
     int numSteps = 0;
     double timeLeft = dt;
     while (timeLeft > 0.0) {
 
-        t2.start();
+        neighbourTimer.start();
         updateGrid();
         updateNearestNeighbours();
-        t2.stop();
+        neighbourTimer.stop();
 
+        simulationTimer.start();
         updateFluidDensityAndPressure();
         updateFluidAcceleration();
 
@@ -785,10 +856,17 @@ void SPHFluidSimulation::update(float dt) {
 
         updateFluidPosition((double)timeStep);
         updateObstacleVelocity((double)timeStep);
+        simulationTimer.stop();
     }
+    graphicsTimer.start();
     updateGraphics(dt);
-    t1.stop();
+    graphicsTimer.stop();
 
+    neighbourSearchTime = neighbourTimer.getTime();
+    simulationTime = simulationTimer.getTime();
+    graphicsUpdateTime = graphicsTimer.getTime();
+
+    /*
     using namespace luabridge;
     lua_State* L = luaL_newstate();
     luaL_openlibs(L);
@@ -799,43 +877,46 @@ void SPHFluidSimulation::update(float dt) {
     }
     LuaRef t = getGlobal(L, "settings");
     bool displayOutput = t["displaySimulationConsoleOutput"].cast<bool>();
-
-    if (displayOutput) {
-        qDebug() << "update:" << t1.getTime() << "neighbours:" << t2.getTime() <<
-                   "pct:" << (t2.getTime()/t1.getTime())*100.0;
-    }
+    */
 
 }
 
 void SPHFluidSimulation::draw() {
+    StopWatch drawTimer = StopWatch();
+    drawTimer.start();
+
     //grid.draw();
 
-    /*
-    glColor3f(0.0, 0.3, 1.0);
-    glPointSize(5.0);
-    glBegin(GL_POINTS);
-    for (uint i=0; i<fluidParticles.size(); i++) {
-        glm::vec3 p = fluidParticles[i]->position;
-        glVertex3f(p.x, p.y, p.z);
-    }
-    */
+    SPHParticle *sp;
+    float size = 0.5*h;
+    for (uint i=0; i<allParticles.size(); i++) {
+        sp = allParticles[i];
+        glm::vec3 p = sp->position;
 
-    /*
-    glPointSize(5.0);
-    glColor3f(1.0, 0.0, 0.0);
-    glBegin(GL_POINTS);
-    for (uint i=0; i<obstacleParticles.size(); i++) {
-        glm::vec3 p = obstacleParticles[i]->position;
-        glVertex3f(p.x, p.y, p.z);
+        if (sp->isObstacle) {
+            glColor3f(0.5, 0.5, 0.5);
+        } else {
+            if (isHiddenBoundaryParticlesEnabled) {
+                glColor4f(sp->color.x, sp->color.y, sp->color.z, sp->alpha);
+            } else {
+                glColor3f(sp->color.x, sp->color.y, sp->color.z);
+            }
+        }
+
+        if (sp->isVisible) {
+            utils::drawBillboard(camera, texture, p, size);
+        }
     }
-    glEnd();
-    */
 
     double w = xmax - xmin;
     double h = ymax - ymin;
     double d = zmax - zmin;
     glColor3f(0.0, 0.0, 0.0);
     utils::drawWireframeCube(glm::vec3(w/2, h/2, d/2), w, h, d);
+
+    drawTimer.stop();
+    graphicsDrawTime = drawTimer.getTime();
+
 }
 
 

@@ -5,6 +5,34 @@
 
 namespace utils {
 
+    void drawBillboard(camera3d *camera, GLuint *tex, glm::vec3 p, float width) {
+        float hw = 0.5*width;
+        glm::vec3 look = glm::normalize(camera->position - p);
+        glm::vec3 right = glm::normalize(glm::cross(camera->up, look));
+        glm::vec3 up = glm::cross(look, right);
+
+        glm::mat4 mat = glm::transpose(glm::mat4(right.x, up.x, look.x, p.x,
+                                                 right.y, up.y, look.y, p.y,
+                                                 right.z, up.z, look.z, p.z,
+                                                 0.0, 0.0, 0.0, 1.0));
+        glPushMatrix();
+        glMultMatrixf((GLfloat*)&mat);
+
+        glEnable(GL_TEXTURE_2D);
+        glDisable(GL_LIGHTING);
+        glBindTexture(GL_TEXTURE_2D, tex[0]);
+        glBegin(GL_QUADS);
+        glTexCoord2f(0.0f, 0.0f); glVertex3f(-hw, -hw,  0.0f);
+        glTexCoord2f(1.0f, 0.0f); glVertex3f( hw, -hw,  0.0f);
+        glTexCoord2f(1.0f, 1.0f); glVertex3f( hw,  hw,  0.0f);
+        glTexCoord2f(0.0f, 1.0f); glVertex3f(-hw,  hw,  0.0f);
+        glEnd();
+        glEnable(GL_LIGHTING);
+        glDisable(GL_TEXTURE_2D);
+
+        glPopMatrix();
+    }
+
     // Draws coordinate axis' and floor grid
     void drawGrid() {
         // draw axis'
@@ -237,6 +265,10 @@ namespace utils {
     // linear interpolation with t in [0,1]
     float lerp(float x1, float x2, float t) {
         return x1 + t*(x2 - x1);
+    }
+
+    float smoothstep(float t) {
+        return t*t*(3 - 2*t);
     }
 
     // From csc 486 Summer 2014 lecture slides

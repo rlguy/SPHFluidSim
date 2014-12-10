@@ -2,6 +2,7 @@
 #define SPHFLUIDSIMULATION_H
 
 #include <QDebug>
+#include <QString>
 #include <vector>
 #include <time.h>
 #include <cmath>
@@ -14,6 +15,7 @@
 #include "stopwatch.h"
 #include "quaternion.h"
 #include "gradients.h"
+#include "camera3d.h"
 
 extern "C" {
 # include "lua/lua.h"
@@ -35,18 +37,18 @@ public:
     void addFluidParticle(glm::vec3 pos, glm::vec3 velocity);
     int addObstacleParticles(std::vector<glm::vec3> points);
     void removeObstacle(int id);
-
     void setBounds(double xmin, double xmax,
                    double ymin, double ymax,
                    double zmin, double zmax);
     void setDampingConstant(double c);
+    void setTexture(GLuint *tex);
+    void setCamera(camera3d *cam);
+    QString getTimingData();
     std::vector<SPHParticle*> getFluidParticles();
     std::vector<SPHParticle*> getObstacleParticles();
     std::vector<SPHParticle*> getAllParticles();
     float getParticleSize();
     float getInitialDensity();
-    void setCameraPosition(glm::vec3 pos);    // used for zsorting
-
     void setObstaclePosition(int id, glm::vec3 pos);
     void translateObstacle(int id, glm::vec3 trans);
     void rotateObstacle(int id, Quaternion q);
@@ -84,12 +86,22 @@ private:
     void updateGraphics(double dt);
     void updateZSortingDistance();
     void updateFluidColor(double dt);
+    void updateFluidParticleColorDensity(double dt, SPHParticle *sp);
+    void updateFluidParticleAlpha(double dt, SPHParticle *sp);
+    glm::vec3 calculateFluidParticleColor(SPHParticle *sp);
+    bool isFluidParticleStuckToBoundary(SPHParticle *sp);
     std::vector<std::array<double, 3>> fluidGradient;
     double maxColorVelocity = 1.0;
     double maxColorAcceleration = 1.0;
     double minColorDensity = 0.0;
     double maxColorDensity = 100.0;
     double colorArrivalRadius = 0.5;
+    double stuckToBoundaryRadius = 0.01;
+    double stuckToBoundaryAlphaVelocity = 1.0;
+    bool isTextureInitialized = false;
+    GLuint *texture;
+    bool isCameraInitialized = false;
+    camera3d *camera;
 
     // simulation constants
     double h;                              // smoothing radius
@@ -127,7 +139,8 @@ private:
     double zmax = 1.0;
     int boundaryObstacleID;
     bool isBoundaryObstacleInitialized = false;
-    bool isBoundaryParticlesEnabled;
+    bool isHiddenBoundaryParticlesEnabled = true;
+    bool isBoundaryParticlesEnabled = false;
 
     SpatialGrid grid;
     std::vector<SPHParticle*> fluidParticles;
@@ -138,6 +151,13 @@ private:
     std::unordered_map<int,SPHObstacle*> obstaclesByID;
     bool isSPHParticleRemoved = false;
     glm::vec3 cameraPosition;
+
+    // timing metrics
+    double neighbourSearchTime = 0.0;
+    double simulationTime = 0.0;
+    double graphicsUpdateTime = 0.0;
+    double graphicsDrawTime = 0.0;
+
 };
 
 #endif // SPHFLUIDSIMULATION_H

@@ -27,9 +27,13 @@ struct SPHParticle {
     bool isVisible = true;
     double zdistance = 0.0;
 
+    // graphics
     glm::vec3 color;
     double colorDensity;
     double colorVelocity = 0.0;
+    bool isStuckInBoundary = false;
+    double boundaryAlphaValue = 1.0;
+    double alpha = 1.0;
 };
 
 

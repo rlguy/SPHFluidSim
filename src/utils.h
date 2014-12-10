@@ -9,6 +9,7 @@
 #include "quaternion.h"
 
 namespace utils {
+    void drawBillboard(camera3d *camera, GLuint *tex, glm::vec3 p, float width);
     void drawGrid();
     void drawWireframeCube(glm::vec3 pos, float size);
     void drawWireframeCube(glm::vec3 pos, float width, float height, float depth);
@@ -22,6 +23,7 @@ namespace utils {
     float pointToLineDistance(glm::vec3 p, glm::vec3 o, glm::vec3 dir);
     glm::vec3 closestPointOnLineFromPoint(glm::vec3 p, glm::vec3 o, glm::vec3 dir);
     float lerp(float x1, float x2, float t);
+    float smoothstep(float t);
     float easeInOut(float t, float t1, float t2);
     glm::vec3 linePlaneIntersection(glm::vec3 lOrigin, glm::vec3 lDir,
                                     glm::vec3 pOrigin, glm::vec3 pNormal);

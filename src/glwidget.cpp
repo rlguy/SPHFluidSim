@@ -137,6 +137,7 @@ void GLWidget::initializeGL()
         exit(1);
     }
     texture[0] = bindTexture(piximg, GL_TEXTURE_2D);
+    fluidSim.setTexture(&texture[0]);
 
     static const GLfloat lightPos[4] = { 20.0f, 20.0f, 20.0f, 1.0f };
     glLightfv(GL_LIGHT0, GL_POSITION, lightPos);
@@ -277,7 +278,7 @@ void GLWidget::updateSimulation() {
     float dt = (float) deltaTimer->elapsed() / 1000;
     deltaTimer->restart();
     updateCameraMovement(dt);
-    fluidSim.setCameraPosition(camera.position);
+    fluidSim.setCamera(&camera);
 
     dt = 1.0 / simulationFPS;
     if (isSimulationPaused) {
@@ -316,12 +317,35 @@ void GLWidget::updateSimulation() {
 void GLWidget::writeFrame() {
     updateGL();
 
+    // image file name
     std::string s = std::to_string(currentFrame);
     s.insert(s.begin(), 6 - s.size(), '0');
     s = "test_render/" + s + ".png";
     bool r = saveFrameToFile(QString::fromStdString(s));
-
     qDebug() << r << QString::fromStdString(s);
+
+    // log timings to file
+    using namespace luabridge;
+    lua_State* L = luaL_newstate();
+    luaL_openlibs(L);
+
+    if (luaL_dofile(L, "scripts/fluid_config.lua") != 0) {
+        qDebug() << "Error loading script";
+        exit(1);
+    }
+    LuaRef t = getGlobal(L, "settings");
+    std::string filename = t["logfile"].cast<std::string>();
+
+    QString f = QString::fromStdString(filename);
+    QString filepath = "logs/" + f;
+    QFile file(filepath);
+    if (file.open(QIODevice::Append)) {
+        QTextStream stream(&file);
+        stream << currentFrame << " " << fluidSim.getTimingData() << endl;
+        file.close();
+    } else {
+        qDebug() << "error opening file: ";
+    }
 
     currentFrame += 1;
 }
@@ -360,38 +384,6 @@ bool GLWidget::saveFrameToFile(QString fileName) {
     return r;
 }
 
-void GLWidget::drawBillboard(GLuint *tex, glm::vec3 p, float width) {
-    float hw = 0.5*width;
-    glm::vec3 look = glm::normalize(camera.position - p);
-    glm::vec3 right = glm::normalize(glm::cross(camera.up, look));
-    glm::vec3 up = glm::cross(look, right);
-
-    glm::mat4 mat = glm::transpose(glm::mat4(right.x, up.x, look.x, p.x,
-                                             right.y, up.y, look.y, p.y,
-                                             right.z, up.z, look.z, p.z,
-                                             0.0, 0.0, 0.0, 1.0));
-    glPushMatrix();
-    glMultMatrixf((GLfloat*)&mat);
-
-    glEnable(GL_TEXTURE_2D);
-    glDisable(GL_LIGHTING);
-    glBindTexture(GL_TEXTURE_2D, tex[0]);
-    glBegin(GL_QUADS);
-    glTexCoord2f(0.0f, 0.0f); glVertex3f(-hw, -hw,  0.0f);
-    glTexCoord2f(1.0f, 0.0f); glVertex3f( hw, -hw,  0.0f);
-    glTexCoord2f(1.0f, 1.0f); glVertex3f( hw,  hw,  0.0f);
-    glTexCoord2f(0.0f, 1.0f); glVertex3f(-hw,  hw,  0.0f);
-    glEnd();
-    glEnable(GL_LIGHTING);
-    glDisable(GL_TEXTURE_2D);
-
-    glPopMatrix();
-}
-
-bool compareByZDistance(const SPHParticle *p1, const SPHParticle *p2) {
-    return p1->zdistance > p2->zdistance;
-}
-
 void GLWidget::paintGL()
 {
     camera.set();
@@ -405,37 +397,6 @@ void GLWidget::paintGL()
     glPushMatrix();
     glMultMatrixf((GLfloat*)&scaleMat);
     fluidSim.draw();
-
-    // draw fluid particles. Color by density value.
-    std::vector<SPHParticle*> particles = fluidSim.getAllParticles();
-    std::sort(particles.begin(), particles.end(), compareByZDistance);
-
-    SPHParticle *sp;
-    float size = 0.5*fluidSim.getParticleSize();
-    for (uint i=0; i<particles.size(); i++) {
-        sp = particles[i];
-        glm::vec3 p = particles[i]->position;
-
-        if (particles[i]->isObstacle) {
-            glColor3f(0.5, 0.5, 0.5);
-        } else {
-            glColor3f(sp->color.x, sp->color.y, sp->color.z);
-        }
-
-        if (particles[i]->isVisible) {
-            drawBillboard(&texture[0], p, size);
-        }
-    }
-
-    // draw obstacle particles
-    particles = fluidSim.getObstacleParticles();
-    glColor3f(0.5, 0.5, 0.5);
-    for (uint i=0; i<particles.size(); i++) {
-        if (particles[i]->isVisible) {
-            glm::vec3 p = particles[i]->position;
-            drawBillboard(&texture[0], p, size);
-        }
-    }
 
     glColor3f(0.0, 0.0, 0.0);
     glPointSize(6.0);
